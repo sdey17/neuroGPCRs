@@ -162,23 +162,6 @@ class DTIFineTuneCrossAttention(nn.Module):
         self.protein_to_mol_attention = CrossAttentionLayer(d_model, n_heads, dropout)
         self.mol_to_protein_attention = CrossAttentionLayer(d_model, n_heads, dropout)
 
-        # Feed-forward layers after cross-attention (before pooling)
-        self.protein_ffn = nn.Sequential(
-            nn.Linear(d_model, d_model * 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model * 2, d_model),
-            nn.LayerNorm(d_model)
-        )
-
-        self.molecule_ffn = nn.Sequential(
-            nn.Linear(d_model, d_model * 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model * 2, d_model),
-            nn.LayerNorm(d_model)
-        )
-
         # Final classifier
         self.classifier = nn.Sequential(
             nn.Linear(d_model * 2, 512),
@@ -256,11 +239,7 @@ class DTIFineTuneCrossAttention(nn.Module):
             return_attention=return_attention
         )
 
-        # Apply feed-forward layers after cross-attention
-        protein_cross_att = self.protein_ffn(protein_cross_att)
-        molecule_cross_att = self.molecule_ffn(molecule_cross_att)
-
-        # Masked mean pooling
+        # Masked mean pooling (directly after cross-attention, no FFN)
         protein_mask_expanded = protein_attention_mask.unsqueeze(-1).float()
         protein_pooled = (protein_cross_att * protein_mask_expanded).sum(1) / protein_mask_expanded.sum(1)
 
@@ -291,11 +270,6 @@ class DTIFineTuneCrossAttention(nn.Module):
             sum(p.numel() for p in self.molecule_self_attention.parameters())
         )
 
-        ffn_params = (
-            sum(p.numel() for p in self.protein_ffn.parameters()) +
-            sum(p.numel() for p in self.molecule_ffn.parameters())
-        )
-
         classifier_params = sum(p.numel() for p in self.classifier.parameters())
         total_params = sum(p.numel() for p in self.parameters())
 
@@ -304,7 +278,6 @@ class DTIFineTuneCrossAttention(nn.Module):
             'molecule_encoder': molecule_params,
             'self_attention': self_attention_params,
             'cross_attention': cross_attention_params,
-            'ffn': ffn_params,
             'classifier': classifier_params,
             'total': total_params
         }
