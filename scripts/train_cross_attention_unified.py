@@ -1,4 +1,4 @@
-"""Training script for Cross-Attention DTI model with end-to-end fine-tuning."""
+"""Unified training script for Cross-Attention DTI model with flexible fine-tuning options."""
 
 import sys
 import os
@@ -23,12 +23,16 @@ from src.utils.finetune_training import train_model_finetune, evaluate_model_fin
 from src.utils.metrics import print_metrics, evaluate_predictions
 
 
-def main(config_path: str = "config.yaml"):
-    """Main fine-tuning function."""
+def main(args):
+    """Main training function with flexible freezing options."""
 
     # Load configuration
-    with open(config_path, 'r') as f:
+    with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
+
+    # Override config with command line arguments
+    freeze_protein = args.freeze_protein
+    freeze_molecule = args.freeze_molecule
 
     # Set device
     device = torch.device("cuda" if torch.cuda.is_available() and config['device']['use_cuda'] else "cpu")
@@ -100,18 +104,35 @@ def main(config_path: str = "config.yaml"):
         num_workers=config['training']['num_workers']
     )
 
-    # Create model
+    # Create model with specified freezing configuration
     print("\n" + "="*60)
-    print("Initializing Fine-Tuning Cross-Attention Model...")
+    print("Initializing Cross-Attention Model...")
+    print(f"Protein Encoder: {'FROZEN' if freeze_protein else 'TRAINABLE'}")
+    print(f"Molecule Encoder: {'FROZEN' if freeze_molecule else 'TRAINABLE'}")
     print("="*60)
+
+    # Determine if both are frozen (use single freeze_encoders flag)
+    freeze_both = freeze_protein and freeze_molecule
+
     model = DTIFineTuneCrossAttention(
         protein_model_name=protein_model_name,
         molecule_model_name=molecule_model_name,
         d_model=config['finetune']['d_model'],
         n_heads=config['finetune']['n_heads'],
         dropout=config['finetune']['dropout'],
-        freeze_encoders=config['finetune']['freeze_encoders']
+        freeze_encoders=freeze_both
     ).to(device)
+
+    # Apply individual freezing if not both frozen
+    if not freeze_both:
+        if freeze_protein:
+            print("Freezing protein encoder weights...")
+            for param in model.protein_encoder.parameters():
+                param.requires_grad = False
+        if freeze_molecule:
+            print("Freezing molecule encoder weights...")
+            for param in model.molecule_encoder.parameters():
+                param.requires_grad = False
 
     # Print model info
     params_dict = model.get_num_params()
@@ -123,27 +144,40 @@ def main(config_path: str = "config.yaml"):
     print(f"  Classifier: {params_dict['classifier']:,}")
     print(f"  Total: {params_dict['total']:,}")
 
-    # Setup optimizer with different learning rates for different components
-    if config['finetune']['freeze_encoders']:
-        # Only train cross-attention and classifier
-        optimizer = optim.AdamW(
-            [p for p in model.parameters() if p.requires_grad],
-            lr=config['finetune']['learning_rate'],
-            weight_decay=config['finetune']['weight_decay']
-        )
-    else:
-        # Use different learning rates for encoders and task-specific layers
-        optimizer = optim.AdamW([
-            {'params': model.protein_encoder.parameters(), 'lr': config['finetune']['encoder_lr']},
-            {'params': model.molecule_encoder.parameters(), 'lr': config['finetune']['encoder_lr']},
-            {'params': model.protein_projector.parameters()},
-            {'params': model.molecule_projector.parameters()},
-            {'params': model.protein_self_attention.parameters()},
-            {'params': model.molecule_self_attention.parameters()},
-            {'params': model.protein_to_mol_attention.parameters()},
-            {'params': model.mol_to_protein_attention.parameters()},
-            {'params': model.classifier.parameters()},
-        ], lr=config['finetune']['learning_rate'], weight_decay=config['finetune']['weight_decay'])
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"  Trainable: {trainable_params:,}")
+
+    # Setup optimizer with different learning rates based on freezing configuration
+    param_groups = []
+
+    if not freeze_protein:
+        param_groups.append({
+            'params': model.protein_encoder.parameters(),
+            'lr': config['finetune']['encoder_lr']
+        })
+
+    if not freeze_molecule:
+        param_groups.append({
+            'params': model.molecule_encoder.parameters(),
+            'lr': config['finetune']['encoder_lr']
+        })
+
+    # Always train task-specific layers
+    param_groups.extend([
+        {'params': model.protein_projector.parameters()},
+        {'params': model.molecule_projector.parameters()},
+        {'params': model.protein_self_attention.parameters()},
+        {'params': model.molecule_self_attention.parameters()},
+        {'params': model.protein_to_mol_attention.parameters()},
+        {'params': model.mol_to_protein_attention.parameters()},
+        {'params': model.classifier.parameters()},
+    ])
+
+    optimizer = optim.AdamW(
+        param_groups,
+        lr=config['finetune']['learning_rate'],
+        weight_decay=config['finetune']['weight_decay']
+    )
 
     # Learning rate scheduler
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(
@@ -158,13 +192,15 @@ def main(config_path: str = "config.yaml"):
 
     # Training
     print("\n" + "="*60)
-    print("Starting Fine-Tuning...")
+    print("Starting Training...")
     print("="*60)
 
     results_dir = Path(config['output']['results_dir'])
     results_dir.mkdir(exist_ok=True)
 
-    save_path = results_dir / "cross_attention_finetune_best.pth"
+    # Create descriptive model name based on freezing configuration
+    freeze_config = f"prot{'_frozen' if freeze_protein else '_train'}_mol{'_frozen' if freeze_molecule else '_train'}"
+    save_path = results_dir / f"cross_attention_{freeze_config}.pth"
 
     model, history = train_model_finetune(
         model=model,
@@ -182,7 +218,7 @@ def main(config_path: str = "config.yaml"):
 
     # Save training history
     history_df = pd.DataFrame(history)
-    history_df.to_csv(results_dir / "history_cross_attention_finetune.csv", index=False)
+    history_df.to_csv(results_dir / f"history_{freeze_config}.csv", index=False)
 
     # Final evaluation
     print("\n" + "="*60)
@@ -195,7 +231,7 @@ def main(config_path: str = "config.yaml"):
     )
     val_df['Predictions'] = val_preds
     val_df['Predictions_Proba'] = val_probs
-    val_df.to_csv(results_dir / "val_predictions_cross_attention_finetune.csv")
+    val_df.to_csv(results_dir / f"val_predictions_{freeze_config}.csv")
 
     print("\nValidation Set:")
     val_metrics = evaluate_predictions(val_df)
@@ -207,7 +243,7 @@ def main(config_path: str = "config.yaml"):
     )
     test_unseen_prot_df['Predictions'] = test_preds
     test_unseen_prot_df['Predictions_Proba'] = test_probs
-    test_unseen_prot_df.to_csv(results_dir / "test_unseen_protein_predictions_cross_attention_finetune.csv")
+    test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_{freeze_config}.csv")
 
     print("\nTest Set (Unseen Protein):")
     test_prot_metrics = evaluate_predictions(test_unseen_prot_df)
@@ -219,21 +255,48 @@ def main(config_path: str = "config.yaml"):
     )
     test_unseen_lig_df['Predictions'] = test_preds
     test_unseen_lig_df['Predictions_Proba'] = test_probs
-    test_unseen_lig_df.to_csv(results_dir / "test_unseen_ligand_predictions_cross_attention_finetune.csv")
+    test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_{freeze_config}.csv")
 
     print("\nTest Set (Unseen Ligand):")
     test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
     print_metrics(test_lig_metrics)
 
     print("\n" + "="*60)
-    print("Fine-Tuning Complete!")
+    print("Training Complete!")
     print("="*60)
-    print(f"Best model saved to: {save_path}")
+    print(f"Model saved to: {save_path}")
+    print(f"Configuration: {freeze_config}")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train Cross-Attention DTI model with fine-tuning")
-    parser.add_argument("--config", type=str, default="config.yaml", help="Path to config file")
+    parser = argparse.ArgumentParser(
+        description="Train Cross-Attention DTI model with flexible encoder freezing options"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="config.yaml",
+        help="Path to config file"
+    )
+    parser.add_argument(
+        "--freeze_protein",
+        action="store_true",
+        help="Freeze protein encoder weights (ProtBert)"
+    )
+    parser.add_argument(
+        "--freeze_molecule",
+        action="store_true",
+        help="Freeze molecule encoder weights (MolFormer)"
+    )
 
     args = parser.parse_args()
-    main(args.config)
+
+    print("\n" + "="*60)
+    print("CROSS-ATTENTION DTI MODEL - UNIFIED TRAINING")
+    print("="*60)
+    print(f"Configuration:")
+    print(f"  Freeze Protein Encoder: {args.freeze_protein}")
+    print(f"  Freeze Molecule Encoder: {args.freeze_molecule}")
+    print("="*60)
+
+    main(args)
