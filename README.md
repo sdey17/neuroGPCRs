@@ -54,9 +54,11 @@ Each CSV should contain the following columns:
 - `SMILES`: SMILES string of the molecule
 - `Label`: Binary label (0 or 1) indicating binding
 
-### Pre-computing Embeddings
+### Pre-computing Embeddings (Optional)
 
-Before training, you'll need to generate embeddings using ProtBert and MolFormer. See `examples/generate_embeddings.py` for details.
+For the Cosine Similarity and Transformer models, you'll need to pre-compute embeddings using ProtBert and MolFormer. See `examples/generate_embeddings.py` for details.
+
+**Note:** The Cross-Attention model with fine-tuning (`train_cross_attention_finetune.py`) computes embeddings on-the-fly and doesn't require pre-computed features.
 
 ### Training Models
 
@@ -76,13 +78,23 @@ python scripts/train_transformer.py \
     --mol_feat /path/to/MolFormer_features.h5
 ```
 
-#### Cross-Attention Model
+#### Cross-Attention Model (with pre-computed embeddings)
 ```bash
 python scripts/train_cross_attention.py \
     --config config.yaml \
     --protein_feat /path/to/ProtBert_features.h5 \
     --mol_feat /path/to/MolFormer_features.h5
 ```
+
+#### Cross-Attention Model (with end-to-end fine-tuning)
+For the cross-attention model, you can also train end-to-end without pre-computing embeddings. This allows fine-tuning of the pre-trained encoders:
+
+```bash
+python scripts/train_cross_attention_finetune.py \
+    --config config.yaml
+```
+
+**Note:** Fine-tuning requires more GPU memory and training time but may achieve better performance by adapting the encoders to your specific task.
 
 ## 📁 Repository Structure
 
@@ -167,6 +179,13 @@ Uses bidirectional cross-attention layers to allow proteins and ligands to atten
 - Most expressive architecture
 - Higher computational cost
 - Best for complex binding patterns
+
+**Two Modes:**
+1. **Pre-computed embeddings** (`train_cross_attention.py`): Uses frozen embeddings from h5 files
+2. **End-to-end fine-tuning** (`train_cross_attention_finetune.py`): Computes embeddings on-the-fly and fine-tunes the encoders
+   - Supports freezing encoders or training them with lower learning rates
+   - Requires more GPU memory but can achieve better performance
+   - Recommended for tasks where you have sufficient training data
 
 ## 📊 Evaluation
 
