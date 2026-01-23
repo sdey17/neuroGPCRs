@@ -1,0 +1,90 @@
+# Configuration file for neuroGPCRs DTI Prediction Models
+
+# Data paths
+data:
+  data_dir: "data"
+  train_file: "training_set.csv"
+  val_file: "validation_set.csv"
+  test_unseen_protein: "test_set_unseen_protein.csv"
+  test_unseen_ligand: "test_set_unseen_ligands.csv"
+
+  # Feature files (h5py format) - Set to null if not using pre-computed features
+  protein_features: null  # e.g., "ProtBert_features.h5"
+  molecule_features: null  # e.g., "MolFormer_features.h5"
+
+# Model architecture
+model:
+  # Model type: "cosine", "transformer", or "cross_attention"
+  type: "transformer"
+
+  # Embedding dimensions
+  protein_encoder: "ProtBert"  # Options: ProtBert (1024), ESM (2560)
+  molecule_encoder: "MolFormer"  # Options: MolFormer (768), ChemBERTa (2048)
+
+  # Architecture parameters
+  latent_dim: 1024  # For cosine and transformer models
+  d_model: 512      # For cross-attention model
+  n_heads: 4        # Number of attention heads
+  n_layers: 2       # Number of transformer layers (for transformer model)
+  dropout: 0.1      # Dropout rate
+
+# Training parameters
+training:
+  num_epochs: 50
+  batch_size: 32
+  learning_rate: 0.0001  # 1e-4
+  weight_decay: 0.0      # L2 regularization
+  num_workers: 0         # Number of data loading workers
+
+  # Optimizer
+  optimizer: "AdamW"  # Options: Adam, AdamW, SGD
+
+  # Loss function
+  criterion: "BCELoss"  # Binary Cross Entropy
+
+  # Early stopping
+  early_stopping:
+    enabled: true
+    patience: 10
+    min_delta: 0.001
+
+  # Learning rate scheduler
+  scheduler:
+    enabled: false
+    type: "ReduceLROnPlateau"  # Options: ReduceLROnPlateau, StepLR, CosineAnnealingLR
+    factor: 0.1
+    patience: 5
+
+# Device settings
+device:
+  use_cuda: true  # Set to false to force CPU
+  device_id: 0    # GPU device ID
+
+# Random seed for reproducibility
+seed: 42
+
+# Output settings
+output:
+  results_dir: "results"
+  save_predictions: true
+  save_model: true
+  model_name: "best_model.pth"
+
+# Evaluation
+evaluation:
+  metrics:
+    - accuracy
+    - precision
+    - sensitivity
+    - specificity
+    - mcc
+    - auc
+
+  # Save confusion matrix
+  save_confusion_matrix: true
+
+# Logging
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+  save_logs: true
+  log_file: "training.log"
