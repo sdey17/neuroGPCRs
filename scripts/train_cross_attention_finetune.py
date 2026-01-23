@@ -120,6 +120,7 @@ def main(config_path: str = "config.yaml"):
     print(f"  Molecule Encoder: {params_dict['molecule_encoder']:,}")
     print(f"  Self-Attention: {params_dict['self_attention']:,}")
     print(f"  Cross-Attention: {params_dict['cross_attention']:,}")
+    print(f"  FFN: {params_dict['ffn']:,}")
     print(f"  Classifier: {params_dict['classifier']:,}")
     print(f"  Total: {params_dict['total']:,}")
 
@@ -142,6 +143,8 @@ def main(config_path: str = "config.yaml"):
             {'params': model.molecule_self_attention.parameters()},
             {'params': model.protein_to_mol_attention.parameters()},
             {'params': model.mol_to_protein_attention.parameters()},
+            {'params': model.protein_ffn.parameters()},
+            {'params': model.molecule_ffn.parameters()},
             {'params': model.classifier.parameters()},
         ], lr=config['finetune']['learning_rate'], weight_decay=config['finetune']['weight_decay'])
 
