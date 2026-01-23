@@ -83,6 +83,34 @@ evaluation:
   # Save confusion matrix
   save_confusion_matrix: true
 
+# Fine-tuning parameters (for end-to-end training with raw sequences)
+finetune:
+  # Pre-trained model names from HuggingFace
+  protein_model: "Rostlab/prot_bert"
+  molecule_model: "ibm/MolFormer-XL-both-10pct"
+
+  # Architecture parameters for cross-attention
+  d_model: 512
+  n_heads: 4
+  dropout: 0.1
+
+  # Training parameters
+  num_epochs: 10
+  batch_size: 8  # Smaller batch size for fine-tuning due to memory constraints
+  learning_rate: 0.00005  # 5e-5 for task-specific layers
+  encoder_lr: 0.00001     # 1e-5 for pre-trained encoders (lower learning rate)
+  weight_decay: 0.01
+
+  # Sequence length limits
+  max_protein_len: 1024
+  max_molecule_len: 512
+
+  # Encoder freezing
+  freeze_encoders: false  # Set to true to freeze encoder weights and only train cross-attention
+
+  # Early stopping
+  early_stopping_patience: 5
+
 # Logging
 logging:
   level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
