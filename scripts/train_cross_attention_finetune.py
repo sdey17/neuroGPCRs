@@ -109,7 +109,6 @@ def main(config_path: str = "config.yaml"):
         molecule_model_name=molecule_model_name,
         d_model=config['finetune']['d_model'],
         n_heads=config['finetune']['n_heads'],
-        n_layers=config['finetune']['n_layers'],
         dropout=config['finetune']['dropout'],
         freeze_encoders=config['finetune']['freeze_encoders']
     ).to(device)
@@ -119,6 +118,7 @@ def main(config_path: str = "config.yaml"):
     print("\nModel Parameters:")
     print(f"  Protein Encoder: {params_dict['protein_encoder']:,}")
     print(f"  Molecule Encoder: {params_dict['molecule_encoder']:,}")
+    print(f"  Self-Attention: {params_dict['self_attention']:,}")
     print(f"  Cross-Attention: {params_dict['cross_attention']:,}")
     print(f"  Classifier: {params_dict['classifier']:,}")
     print(f"  Total: {params_dict['total']:,}")
@@ -138,7 +138,10 @@ def main(config_path: str = "config.yaml"):
             {'params': model.molecule_encoder.parameters(), 'lr': config['finetune']['encoder_lr']},
             {'params': model.protein_projector.parameters()},
             {'params': model.molecule_projector.parameters()},
-            {'params': model.cross_attention_layers.parameters()},
+            {'params': model.protein_self_attention.parameters()},
+            {'params': model.molecule_self_attention.parameters()},
+            {'params': model.protein_to_mol_attention.parameters()},
+            {'params': model.mol_to_protein_attention.parameters()},
             {'params': model.classifier.parameters()},
         ], lr=config['finetune']['learning_rate'], weight_decay=config['finetune']['weight_decay'])
 

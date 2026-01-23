@@ -98,10 +98,9 @@ class DTIFineTuneCrossAttention(nn.Module):
     Args:
         protein_model_name: HuggingFace model name for protein encoder
         molecule_model_name: HuggingFace model name for molecule encoder
-        d_model: Model dimensionality for cross-attention
-        n_heads: Number of attention heads
-        n_layers: Number of cross-attention layers
-        dropout: Dropout rate
+        d_model: Model dimensionality for cross-attention (default 512)
+        n_heads: Number of attention heads (default 4)
+        dropout: Dropout rate (default 0.1)
         freeze_encoders: Whether to freeze encoder weights
     """
 
@@ -111,7 +110,6 @@ class DTIFineTuneCrossAttention(nn.Module):
         molecule_model_name: str = "ibm/MolFormer-XL-both-10pct",
         d_model: int = 512,
         n_heads: int = 4,
-        n_layers: int = 2,
         dropout: float = 0.1,
         freeze_encoders: bool = False
     ):
@@ -144,33 +142,27 @@ class DTIFineTuneCrossAttention(nn.Module):
         self.protein_projector = nn.Linear(protein_hidden_size, d_model)
         self.molecule_projector = nn.Linear(molecule_hidden_size, d_model)
 
-        # Cross-attention layers (stacked)
-        self.cross_attention_layers = nn.ModuleList([
-            nn.ModuleDict({
-                'protein_to_mol': CrossAttentionLayer(d_model, n_heads, dropout),
-                'mol_to_protein': CrossAttentionLayer(d_model, n_heads, dropout)
-            })
-            for _ in range(n_layers)
-        ])
-
-        # Feed-forward layers after cross-attention
-        self.protein_ffn = nn.Sequential(
-            nn.Linear(d_model, d_model * 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model * 2, d_model),
-            nn.LayerNorm(d_model)
+        # Self-attention layers (matching original architecture)
+        self.protein_self_attention = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=d_model * 2,
+            dropout=dropout,
+            batch_first=True
+        )
+        self.molecule_self_attention = nn.TransformerEncoderLayer(
+            d_model=d_model,
+            nhead=n_heads,
+            dim_feedforward=d_model * 2,
+            dropout=dropout,
+            batch_first=True
         )
 
-        self.molecule_ffn = nn.Sequential(
-            nn.Linear(d_model, d_model * 2),
-            nn.ReLU(),
-            nn.Dropout(dropout),
-            nn.Linear(d_model * 2, d_model),
-            nn.LayerNorm(d_model)
-        )
+        # Cross-attention layers (single layer, not stacked)
+        self.protein_to_mol_attention = CrossAttentionLayer(d_model, n_heads, dropout)
+        self.mol_to_protein_attention = CrossAttentionLayer(d_model, n_heads, dropout)
 
-        # Final classifier
+        # Final classifier (matches original exactly)
         self.classifier = nn.Sequential(
             nn.Linear(d_model * 2, 512),
             nn.ReLU(),
@@ -220,49 +212,46 @@ class DTIFineTuneCrossAttention(nn.Module):
         protein_proj = self.protein_projector(protein_embeddings)
         molecule_proj = self.molecule_projector(molecule_embeddings)
 
-        # Apply stacked cross-attention layers
-        attention_weights_list = []
-        protein_cross = protein_proj
-        molecule_cross = molecule_proj
+        # Self-attention with masking (matching original)
+        protein_self_att = self.protein_self_attention(
+            protein_proj,
+            src_key_padding_mask=~protein_attention_mask.bool()
+        )
+        molecule_self_att = self.molecule_self_attention(
+            molecule_proj,
+            src_key_padding_mask=~molecule_attention_mask.bool()
+        )
 
-        for layer in self.cross_attention_layers:
-            # Protein attends to molecule
-            protein_cross, p2m_att = layer['protein_to_mol'](
-                protein_cross, molecule_cross, molecule_cross,
-                key_mask=molecule_attention_mask,
-                return_attention=return_attention
-            )
+        # Cross-attention (single layer, matching original)
+        protein_cross_att, prot_to_mol_att = self.protein_to_mol_attention(
+            protein_self_att,
+            molecule_self_att,
+            molecule_self_att,
+            key_mask=molecule_attention_mask,
+            return_attention=return_attention
+        )
 
-            # Molecule attends to protein
-            molecule_cross, m2p_att = layer['mol_to_protein'](
-                molecule_cross, protein_cross, protein_cross,
-                key_mask=protein_attention_mask,
-                return_attention=return_attention
-            )
+        molecule_cross_att, mol_to_prot_att = self.mol_to_protein_attention(
+            molecule_self_att,
+            protein_self_att,
+            protein_self_att,
+            key_mask=protein_attention_mask,
+            return_attention=return_attention
+        )
 
-            if return_attention:
-                attention_weights_list.append({
-                    'protein_to_mol': p2m_att,
-                    'mol_to_protein': m2p_att
-                })
-
-        # Apply feed-forward layers
-        protein_cross = self.protein_ffn(protein_cross)
-        molecule_cross = self.molecule_ffn(molecule_cross)
-
-        # Pool over sequence dimension (mean pooling with attention mask)
+        # Masked mean pooling (matching original exactly)
         protein_mask_expanded = protein_attention_mask.unsqueeze(-1).float()
-        protein_pooled = (protein_cross * protein_mask_expanded).sum(1) / protein_mask_expanded.sum(1)
+        protein_pooled = (protein_cross_att * protein_mask_expanded).sum(1) / protein_mask_expanded.sum(1)
 
         molecule_mask_expanded = molecule_attention_mask.unsqueeze(-1).float()
-        molecule_pooled = (molecule_cross * molecule_mask_expanded).sum(1) / molecule_mask_expanded.sum(1)
+        molecule_pooled = (molecule_cross_att * molecule_mask_expanded).sum(1) / molecule_mask_expanded.sum(1)
 
         # Combine and classify
         combined_features = torch.cat([protein_pooled, molecule_pooled], dim=1)
         logits = self.classifier(combined_features)
 
         if return_attention:
-            return logits, attention_weights_list
+            return logits, {'protein_to_mol': prot_to_mol_att, 'mol_to_protein': mol_to_prot_att}
 
         return logits
 
@@ -270,13 +259,24 @@ class DTIFineTuneCrossAttention(nn.Module):
         """Get number of parameters in each component."""
         protein_params = sum(p.numel() for p in self.protein_encoder.parameters())
         molecule_params = sum(p.numel() for p in self.molecule_encoder.parameters())
-        cross_attention_params = sum(p.numel() for layer in self.cross_attention_layers for p in layer.parameters())
+
+        cross_attention_params = (
+            sum(p.numel() for p in self.protein_to_mol_attention.parameters()) +
+            sum(p.numel() for p in self.mol_to_protein_attention.parameters())
+        )
+
+        self_attention_params = (
+            sum(p.numel() for p in self.protein_self_attention.parameters()) +
+            sum(p.numel() for p in self.molecule_self_attention.parameters())
+        )
+
         classifier_params = sum(p.numel() for p in self.classifier.parameters())
         total_params = sum(p.numel() for p in self.parameters())
 
         return {
             'protein_encoder': protein_params,
             'molecule_encoder': molecule_params,
+            'self_attention': self_attention_params,
             'cross_attention': cross_attention_params,
             'classifier': classifier_params,
             'total': total_params
