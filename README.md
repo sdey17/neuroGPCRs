@@ -123,6 +123,64 @@ python scripts/train_cross_attention_unified.py
 - `--freeze_molecule`: Freeze MolFormer encoder weights
 - `--config`: Path to configuration file (default: `config.yaml`)
 
+### Making Predictions (Inference)
+
+Once you have a trained model, you can predict GPCR-ligand interactions for new compounds using the `predict_interactions.py` script:
+
+#### Predict for a single SMILES:
+```bash
+python scripts/predict_interactions.py \
+    --smiles "CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1" \
+    --model results/cross_attention_prot_frozen_mol_frozen.pth \
+    --output my_predictions.csv \
+    --top_k 10
+```
+
+#### Predict for multiple SMILES from a file:
+```bash
+# Create a file with SMILES (one per line)
+cat > compounds.txt << EOF
+CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1
+COc1cc(N(C)CCN(C)C)c2nc(C(=O)Nc3ccc(N4CCOCC4)cc3)cc(O)c2c1
+COc1ccccc1OCCNCCCc1c[nH]c2ccccc12
+EOF
+
+# Run predictions
+python scripts/predict_interactions.py \
+    --smiles_file compounds.txt \
+    --model results/cross_attention_prot_frozen_mol_frozen.pth \
+    --output batch_predictions.csv \
+    --threshold 0.5
+```
+
+**Prediction Options:**
+- `--smiles`: Single SMILES string to predict
+- `--smiles_file`: File containing SMILES strings (one per line)
+- `--model`: Path to trained model checkpoint (.pth file)
+- `--data`: Path to training CSV (to extract GPCR sequences, default: `data/training_set.csv`)
+- `--output`: Output CSV file for predictions
+- `--top_k`: Only save top K predictions per compound
+- `--threshold`: Only save predictions above this probability threshold
+- `--batch_size`: Batch size for inference (default: 16)
+
+**Output Format:**
+
+The predictions are saved as a CSV file with the following columns:
+- `SMILES`: Input compound SMILES
+- `UniProt`: UniProt ID of the GPCR
+- `Target_Sequence`: Amino acid sequence of the GPCR
+- `Binding_Probability`: Predicted binding probability (0-1)
+
+Results are sorted by binding probability (highest first).
+
+**Example Output:**
+```
+SMILES,UniProt,Target_Sequence,Binding_Probability
+CCOCc1sc...,P29274,MPIMGSSVYITVELAIAVLAILGNVLVCWAVWLNS...,0.8523
+CCOCc1sc...,P30542,MPPSISAFQAAYIGIEVLIALVSVPGNVLVIWAVK...,0.7891
+CCOCc1sc...,P28222,MEEPGAQCAPPPPAGSETWVPQANLSSAPSQNCSA...,0.7234
+```
+
 ## 📁 Repository Structure
 
 ```
@@ -144,12 +202,15 @@ neuroGPCRs/
 │       ├── metrics.py          # Evaluation metrics
 │       ├── training.py         # Training utilities
 │       └── finetune_training.py  # Fine-tuning utilities
-├── scripts/                    # Training scripts
+├── scripts/                    # Training and prediction scripts
 │   ├── train_cosine.py
 │   ├── train_transformer.py
 │   ├── train_cross_attention.py
-│   └── train_cross_attention_unified.py  # All 4 CA variants
+│   ├── train_cross_attention_unified.py  # All 4 CA variants
+│   └── predict_interactions.py  # Inference script for new compounds
 ├── examples/                   # Example notebooks and scripts
+│   ├── predict_example.py      # Example prediction usage
+│   └── example_smiles.txt      # Example SMILES input file
 ├── manuscript/                 # Research manuscript
 │   ├── Main_text.docx
 │   └── Supplementary_info.docx
