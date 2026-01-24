@@ -14,82 +14,80 @@ python examples/quick_start.py
 
 ## Pre-computing Embeddings
 
-Before training any models, you need to generate embeddings for your proteins and molecules using pre-trained language models.
+Before training CosSim, Transformer, or XGBoost models, you need to generate embeddings using pre-trained language models (ProtBert for proteins, MolFormer for molecules).
 
-### Protein Embeddings (ProtBert)
+**Note:** Cross-attention models can encode sequences on-the-fly and don't require pre-computed embeddings.
 
-```python
-from transformers import AutoTokenizer, AutoModel
-import torch
-import h5py
-import pandas as pd
+### Using the Embedding Generation Script
 
-# Load ProtBert
-tokenizer = AutoTokenizer.from_pretrained("Rostlab/prot_bert", do_lower_case=False)
-model = AutoModel.from_pretrained("Rostlab/prot_bert")
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
+The repository provides `scripts/generate_embeddings.py` for automated embedding generation with proper attention-masked mean pooling:
 
-# Load your data
-df = pd.read_csv("data/training_set.csv")
-
-# Create h5 file for storing embeddings
-with h5py.File("ProtBert_features.h5", "w") as f:
-    for sequence in df['Target Sequence'].unique():
-        # Add spaces between amino acids
-        spaced_seq = ' '.join(list(sequence))
-
-        # Tokenize and encode
-        inputs = tokenizer(spaced_seq, return_tensors="pt", padding=True, truncation=True, max_length=1024)
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-
-        with torch.no_grad():
-            outputs = model(**inputs)
-
-        # Use mean pooling of last hidden state
-        embedding = outputs.last_hidden_state.mean(dim=1).cpu().numpy()
-
-        # Store in h5 file
-        f.create_dataset(sequence, data=embedding)
-
-print("Protein embeddings saved to ProtBert_features.h5")
+```bash
+# Generate both protein and molecule embeddings from all datasets
+python scripts/generate_embeddings.py \
+    --data_files data/training_set.csv data/validation_set.csv \
+                data/test_set_unseen_protein.csv data/test_set_unseen_ligands.csv \
+    --output_dir . \
+    --protein_batch_size 8 \
+    --molecule_batch_size 32
 ```
 
-### Molecule Embeddings (MolFormer)
+This will create:
+- `prot_bert_features.h5` - Protein embeddings (1024-dim)
+- `MolFormer-XL-both-10pct_features.h5` - Molecule embeddings (768-dim)
 
-```python
-from transformers import AutoTokenizer, AutoModel
-import torch
-import h5py
-import pandas as pd
+### Advanced Options
 
-# Load MolFormer
-tokenizer = AutoTokenizer.from_pretrained("ibm/MolFormer-XL-both-10pct", trust_remote_code=True)
-model = AutoModel.from_pretrained("ibm/MolFormer-XL-both-10pct", trust_remote_code=True)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = model.to(device)
+**Skip protein or molecule generation:**
+```bash
+# Only generate protein embeddings
+python scripts/generate_embeddings.py --skip_molecules
 
-# Load your data
-df = pd.read_csv("data/training_set.csv")
-
-# Create h5 file for storing embeddings
-with h5py.File("MolFormer_features.h5", "w") as f:
-    for smiles in df['SMILES'].unique():
-        # Tokenize and encode
-        inputs = tokenizer(smiles, return_tensors="pt", padding=True, truncation=True, max_length=512)
-        inputs = {k: v.to(device) for k, v in inputs.items()}
-
-        with torch.no_grad():
-            outputs = model(**inputs)
-
-        # Use mean pooling of last hidden state
-        embedding = outputs.last_hidden_state.mean(dim=1).cpu().numpy()
-
-        # Store in h5 file
-        f.create_dataset(smiles, data=embedding)
-
-print("Molecule embeddings saved to MolFormer_features.h5")
+# Only generate molecule embeddings
+python scripts/generate_embeddings.py --skip_proteins
 ```
+
+**Use custom models:**
+```bash
+python scripts/generate_embeddings.py \
+    --protein_model "Rostlab/prot_bert_bfd" \
+    --molecule_model "seyonec/ChemBERTa-zinc-base-v1"
+```
+
+**Adjust batch sizes for your GPU:**
+```bash
+# Smaller batches for limited GPU memory
+python scripts/generate_embeddings.py \
+    --protein_batch_size 4 \
+    --molecule_batch_size 16
+```
+
+### Output Format
+
+Embeddings are saved as HDF5 files with sequences/SMILES as keys:
+```python
+import h5py
+
+# Load protein embeddings
+with h5py.File("prot_bert_features.h5", "r") as f:
+    sequence = "MPIMGSSVYITVELAIAVLAILGNVLVCWAVWLNS..."
+    embedding = f[sequence][:]  # Shape: (1024,)
+
+# Load molecule embeddings
+with h5py.File("MolFormer-XL-both-10pct_features.h5", "r") as f:
+    smiles = "CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1"
+    embedding = f[smiles][:]  # Shape: (768,)
+```
+
+### Technical Details
+
+The script uses **attention-masked mean pooling** from the last hidden state:
+```python
+attention_mask = inputs['attention_mask'].unsqueeze(-1)
+embeddings = (outputs.last_hidden_state * attention_mask).sum(1) / attention_mask.sum(1)
+```
+
+This properly handles padding tokens, unlike simple `.mean(dim=1)` which includes padding in the average.
 
 ## Advanced Examples
 
