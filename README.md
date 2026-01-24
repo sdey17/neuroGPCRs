@@ -1,4 +1,4 @@
-# neuroGPCRs: Deep Learning for GPCR-Ligand Binding Prediction
+# neuroGPCRs: Evaluation of Deep Learning Architectures for Predicting GPCR-Mediated Neurotoxicity
 
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
@@ -6,21 +6,40 @@
 
 ## Abstract
 
-G protein-coupled receptors (GPCRs) are therapeutic targets for over 30% of approved drugs, yet specific GPCR subtypes act as molecular initiating events in several neurotoxic adverse outcome pathways. This repository implements three deep learning architectures for predicting GPCR-ligand binding interactions:
+G protein-coupled receptors (GPCRs) are therapeutic targets for over 30% of approved drugs, yet specific GPCR subtypes act as molecular initiating events in several neurotoxic adverse outcome pathways. This repository implements **seven deep learning architectures** for predicting GPCR-ligand binding interactions, systematically evaluating the impact of encoder fine-tuning strategies.
 
-1. **Dual-Projection Cosine Similarity Networks** - Projects protein and ligand embeddings to a shared space and computes cosine similarity
-2. **Transformer Encoder Networks** - Uses self-attention mechanisms to process concatenated protein-ligand representations
-3. **Cross-Attention Networks** - Employs bidirectional cross-attention between protein and ligand representations
+### Models Implemented
 
-All models use pre-trained language models (ProtBert for proteins, MolFormer for molecules) to generate initial embeddings, achieving strong performance on multiple evaluation scenarios including unseen proteins and ligands.
+1. **CosSim** - Dual-Projection Cosine Similarity Networks
+2. **Transformers** - Transformer Encoder Networks
+3. **CA-Base** - Cross-Attention with frozen protein and ligand encoders
+4. **CA-Lig** - Cross-Attention with fine-tuned ligand encoder
+5. **CA-Prot** - Cross-Attention with fine-tuned protein encoder
+6. **CA-Full** - Cross-Attention with both encoders fine-tuned
+7. **XGB** - XGBoost baseline
 
-## 📊 Performance
+All models leverage pre-trained language models (ProtBert for proteins, MolFormer for ligands) and are evaluated on multiple challenging scenarios including unseen proteins and unseen ligands.
 
-| Model | Validation AUC | Unseen Protein AUC | Unseen Ligand AUC |
-|-------|---------------|-------------------|-------------------|
-| Cosine Similarity | 0.91 | 0.61 | 0.81 |
-| Transformer | 0.91 | 0.61 | 0.81 |
-| Cross-Attention | 0.91 | 0.61 | 0.81 |
+## 📊 Performance (Off-Target Profiling Task)
+
+| Model | Accuracy | Sensitivity | Specificity | MCC | AUROC |
+|-------|----------|-------------|-------------|-----|-------|
+| **CosSim** | 0.785 ± 0.018 | 0.374 ± 0.025 | 0.912 ± 0.025 | 0.338 ± 0.041 | 0.640 ± 0.012 |
+| **Transformers** | 0.744 ± 0.017 | 0.472 ± 0.053 | 0.827 ± 0.021 | 0.296 ± 0.048 | 0.632 ± 0.013 |
+| **CA-Base** | **0.795 ± 0.010** | 0.494 ± 0.041 | **0.888 ± 0.018** | 0.403 ± 0.029 | **0.714 ± 0.017** |
+| **CA-Lig** | 0.794 ± 0.021 | **0.506 ± 0.037** | 0.882 ± 0.024 | **0.407 ± 0.051** | 0.698 ± 0.014 |
+| **CA-Prot** | 0.670 ± 0.028 | 0.331 ± 0.102 | 0.774 ± 0.064 | 0.103 ± 0.040 | 0.553 ± 0.025 |
+| **CA-Full** | 0.709 ± 0.009 | 0.410 ± 0.044 | 0.802 ± 0.025 | 0.208 ± 0.014 | 0.606 ± 0.010 |
+| **XGB** | 0.754 ± 0.014 | 0.353 ± 0.031 | 0.878 ± 0.013 | 0.257 ± 0.042 | 0.623 ± 0.011 |
+
+**Key Finding**: CA-Base (frozen encoders) achieves the best performance, suggesting that task-specific training of pre-trained encoders may lead to overfitting for this dataset.
+
+## 🔬 Dataset
+
+- **Training Set**: 119 GPCRs with binding data
+- **Validation Set**: Random split from training distribution
+- **Test Set (Unseen Proteins)**: 9 GPCRs not seen during training
+- **Test Set (Unseen Ligands)**: Ligands not seen during training
 
 ## 🚀 Quick Start
 
@@ -56,13 +75,13 @@ Each CSV should contain the following columns:
 
 ### Pre-computing Embeddings (Optional)
 
-For the Cosine Similarity and Transformer models, you'll need to pre-compute embeddings using ProtBert and MolFormer. See `examples/generate_embeddings.py` for details.
+For CosSim, Transformers, and XGBoost models, pre-compute embeddings using ProtBert and MolFormer. See `examples/generate_embeddings.py` for details.
 
-**Note:** The Cross-Attention model with fine-tuning (`train_cross_attention_finetune.py`) computes embeddings on-the-fly and doesn't require pre-computed features.
+**Note:** Cross-attention models can compute embeddings on-the-fly, eliminating the need for pre-computed features.
 
 ### Training Models
 
-#### Cosine Similarity Model
+#### 1. Cosine Similarity Model
 ```bash
 python scripts/train_cosine.py \
     --config config.yaml \
@@ -70,7 +89,7 @@ python scripts/train_cosine.py \
     --mol_feat /path/to/MolFormer_features.h5
 ```
 
-#### Transformer Model
+#### 2. Transformer Encoder Model
 ```bash
 python scripts/train_transformer.py \
     --config config.yaml \
@@ -78,23 +97,89 @@ python scripts/train_transformer.py \
     --mol_feat /path/to/MolFormer_features.h5
 ```
 
-#### Cross-Attention Model (with pre-computed embeddings)
-```bash
-python scripts/train_cross_attention.py \
-    --config config.yaml \
-    --protein_feat /path/to/ProtBert_features.h5 \
-    --mol_feat /path/to/MolFormer_features.h5
-```
+#### 3. Cross-Attention Models (Unified Script)
 
-#### Cross-Attention Model (with end-to-end fine-tuning)
-For the cross-attention model, you can also train end-to-end without pre-computing embeddings. This allows fine-tuning of the pre-trained encoders:
+The repository provides a **unified training script** that supports all four cross-attention variants:
 
 ```bash
-python scripts/train_cross_attention_finetune.py \
-    --config config.yaml
+# CA-Base: Both encoders frozen (best performance)
+python scripts/train_cross_attention_unified.py \
+    --freeze_protein --freeze_molecule
+
+# CA-Lig: Fine-tune ligand encoder only
+python scripts/train_cross_attention_unified.py \
+    --freeze_protein
+
+# CA-Prot: Fine-tune protein encoder only
+python scripts/train_cross_attention_unified.py \
+    --freeze_molecule
+
+# CA-Full: Fine-tune both encoders
+python scripts/train_cross_attention_unified.py
 ```
 
-**Note:** Fine-tuning requires more GPU memory and training time but may achieve better performance by adapting the encoders to your specific task.
+**Configuration Options:**
+- `--freeze_protein`: Freeze ProtBert encoder weights
+- `--freeze_molecule`: Freeze MolFormer encoder weights
+- `--config`: Path to configuration file (default: `config.yaml`)
+
+### Making Predictions (Inference)
+
+Once you have a trained model, you can predict GPCR-ligand interactions for new compounds using the `predict_interactions.py` script:
+
+#### Predict for a single SMILES:
+```bash
+python scripts/predict_interactions.py \
+    --smiles "CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1" \
+    --model results/cross_attention_prot_frozen_mol_frozen.pth \
+    --output my_predictions.csv \
+    --top_k 10
+```
+
+#### Predict for multiple SMILES from a file:
+```bash
+# Create a file with SMILES (one per line)
+cat > compounds.txt << EOF
+CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1
+COc1cc(N(C)CCN(C)C)c2nc(C(=O)Nc3ccc(N4CCOCC4)cc3)cc(O)c2c1
+COc1ccccc1OCCNCCCc1c[nH]c2ccccc12
+EOF
+
+# Run predictions
+python scripts/predict_interactions.py \
+    --smiles_file compounds.txt \
+    --model results/cross_attention_prot_frozen_mol_frozen.pth \
+    --output batch_predictions.csv \
+    --threshold 0.5
+```
+
+**Prediction Options:**
+- `--smiles`: Single SMILES string to predict
+- `--smiles_file`: File containing SMILES strings (one per line)
+- `--model`: Path to trained model checkpoint (.pth file)
+- `--data`: Path to training CSV (to extract GPCR sequences, default: `data/training_set.csv`)
+- `--output`: Output CSV file for predictions
+- `--top_k`: Only save top K predictions per compound
+- `--threshold`: Only save predictions above this probability threshold
+- `--batch_size`: Batch size for inference (default: 16)
+
+**Output Format:**
+
+The predictions are saved as a CSV file with the following columns:
+- `SMILES`: Input compound SMILES
+- `UniProt`: UniProt ID of the GPCR
+- `Target_Sequence`: Amino acid sequence of the GPCR
+- `Binding_Probability`: Predicted binding probability (0-1)
+
+Results are sorted by binding probability (highest first).
+
+**Example Output:**
+```
+SMILES,UniProt,Target_Sequence,Binding_Probability
+CCOCc1sc...,P29274,MPIMGSSVYITVELAIAVLAILGNVLVCWAVWLNS...,0.8523
+CCOCc1sc...,P30542,MPPSISAFQAAYIGIEVLIALVSVPGNVLVIWAVK...,0.7891
+CCOCc1sc...,P28222,MEEPGAQCAPPPPAGSETWVPQANLSSAPSQNCSA...,0.7234
+```
 
 ## 📁 Repository Structure
 
@@ -109,23 +194,34 @@ neuroGPCRs/
 │   ├── models/                 # Model architectures
 │   │   ├── cosine_model.py
 │   │   ├── transformer_model.py
-│   │   └── cross_attention_model.py
+│   │   ├── cross_attention_model.py  # For pre-computed embeddings
+│   │   └── cross_attention_finetune.py  # For on-the-fly encoding
 │   └── utils/                  # Utility functions
-│       ├── data_loader.py      # Data loading utilities
+│       ├── data_loader.py      # Data loading (pre-computed embeddings)
+│       ├── finetune_data_loader.py  # Data loading (raw sequences)
 │       ├── metrics.py          # Evaluation metrics
-│       └── training.py         # Training utilities
-├── scripts/                    # Training scripts
+│       ├── training.py         # Training utilities
+│       └── finetune_training.py  # Fine-tuning utilities
+├── scripts/                    # Training and prediction scripts
 │   ├── train_cosine.py
 │   ├── train_transformer.py
-│   └── train_cross_attention.py
+│   ├── train_cross_attention.py
+│   ├── train_cross_attention_unified.py  # All 4 CA variants
+│   └── predict_interactions.py  # Inference script for new compounds
 ├── examples/                   # Example notebooks and scripts
-├── results/                    # Output directory for results
-├── tests/                      # Unit tests
-├── docs/                       # Documentation
-├── config.yaml                 # Configuration file
-├── requirements.txt            # Python dependencies
-├── README.md                   # This file
-└── LICENSE                     # License file
+│   ├── predict_example.py      # Example prediction usage
+│   └── example_smiles.txt      # Example SMILES input file
+├── manuscript/                 # Research manuscript
+│   ├── Main_text.docx
+│   └── Supplementary_info.docx
+├── old_scripts/               # Original implementation (reference)
+├── results/                   # Output directory for results
+├── tests/                     # Unit tests
+├── docs/                      # Documentation
+├── config.yaml                # Configuration file
+├── requirements.txt           # Python dependencies
+├── README.md                  # This file
+└── LICENSE                    # MIT License
 ```
 
 ## 🔧 Configuration
@@ -137,31 +233,30 @@ Edit `config.yaml` to customize:
 - Device settings (CPU/GPU)
 - Output directories
 
-Example configuration:
+Example configuration for cross-attention models:
 ```yaml
-model:
-  type: "transformer"
-  protein_encoder: "ProtBert"
-  molecule_encoder: "MolFormer"
-  latent_dim: 1024
+finetune:
+  protein_model: "Rostlab/prot_bert"
+  molecule_model: "ibm/MolFormer-XL-both-10pct"
+  d_model: 512
   n_heads: 4
   dropout: 0.1
-
-training:
-  num_epochs: 50
-  batch_size: 32
-  learning_rate: 0.0001
+  num_epochs: 10
+  batch_size: 8
+  learning_rate: 0.00005  # Task-specific layers
+  encoder_lr: 0.00001     # Pre-trained encoders (if trainable)
 ```
 
 ## 📚 Model Architectures
 
-### 1. Cosine Similarity Model
+### 1. Cosine Similarity Model (CosSim)
 Projects protein and ligand embeddings to a shared 1024-dimensional space using linear layers, then computes cosine similarity as the binding score.
 
 **Key Features:**
 - Simple and interpretable
 - Low computational cost
 - Good baseline performance
+- Requires pre-computed embeddings
 
 ### 2. Transformer Encoder Model
 Concatenates projected protein and ligand embeddings, processes through a multi-head transformer encoder, and classifies with an MLP.
@@ -170,48 +265,62 @@ Concatenates projected protein and ligand embeddings, processes through a multi-
 - Self-attention mechanism
 - Captures complex interactions
 - Moderate computational cost
+- Requires pre-computed embeddings
 
-### 3. Cross-Attention Model
+### 3. Cross-Attention Models (4 Variants)
+
 Uses bidirectional cross-attention layers to allow proteins and ligands to attend to each other, capturing fine-grained interaction patterns.
 
-**Key Features:**
-- Bidirectional attention
-- Most expressive architecture
-- Higher computational cost
-- Best for complex binding patterns
+**Architecture Flow:**
+1. Encoders (ProtBert 1024-dim, MolFormer 768-dim)
+2. Projectors to 512-dim shared space
+3. Self-attention on both modalities
+4. Bidirectional cross-attention (protein ↔ ligand)
+5. Masked mean pooling
+6. Concatenation (1024-dim)
+7. MLP classifier (1024 → 512 → 256 → 1)
 
-**Two Modes:**
-1. **Pre-computed embeddings** (`train_cross_attention.py`): Uses frozen embeddings from h5 files
-2. **End-to-end fine-tuning** (`train_cross_attention_finetune.py`): Computes embeddings on-the-fly and fine-tunes the encoders
-   - Supports freezing encoders or training them with lower learning rates
-   - Requires more GPU memory but can achieve better performance
-   - Recommended for tasks where you have sufficient training data
+**Four Variants:**
+- **CA-Base**: Both encoders frozen (★ **Best Performance**)
+- **CA-Lig**: Fine-tune ligand encoder, freeze protein encoder
+- **CA-Prot**: Fine-tune protein encoder, freeze ligand encoder
+- **CA-Full**: Fine-tune both encoders
+
+**Key Features:**
+- Bidirectional attention mechanism
+- Most expressive architecture
+- Can compute embeddings on-the-fly
+- Supports flexible encoder freezing strategies
+
+### 4. XGBoost Baseline (XGB)
+Traditional machine learning baseline using XGBoost on projected embeddings.
 
 ## 📊 Evaluation
 
 Models are evaluated on three test scenarios:
 1. **Random Split Validation**: Standard validation set from training distribution
-2. **Unseen Proteins**: Test set containing proteins not seen during training
-3. **Unseen Ligands**: Test set containing ligands not seen during training
+2. **Unseen Proteins**: 9 GPCRs not present in training data
+3. **Unseen Ligands**: Ligands not seen during training
 
-Metrics computed:
+**Metrics Computed:**
 - Accuracy
 - Precision
 - Sensitivity (Recall)
 - Specificity
 - Matthews Correlation Coefficient (MCC)
-- Area Under ROC Curve (AUC)
+- Area Under ROC Curve (AUROC)
 
 ## 🔬 Citation
 
 If you use this code in your research, please cite:
 
 ```bibtex
-@article{neurogpcrs2024,
-  title={Deep Learning Models for GPCR-Ligand Binding Prediction},
-  author={Your Name},
-  journal={Journal Name},
-  year={2024}
+@article{dey2024neurogpcrs,
+  title={Evaluation of Deep Learning Architectures for Predicting GPCR-Mediated Neurotoxicity},
+  author={Dey, Souvik and Lu, Pinyi and Wallqvist, Anders and AbdulHameed, Mohamed Diwan M.},
+  journal={In preparation},
+  year={2024},
+  institution={DoD Biotechnology HPC Software Applications Institute}
 }
 ```
 
@@ -231,20 +340,34 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📧 Contact
 
-For questions or issues, please open an issue on GitHub or contact [your.email@example.com](mailto:your.email@example.com).
+For questions or issues, please open an issue on GitHub.
+
+**Authors:**
+- Souvik Dey
+- Pinyi Lu
+- Anders Wallqvist (sven.a.wallqvist.civ@health.mil)
+- Mohamed Diwan M. AbdulHameed (mabdulhameed@bhsai.org)
+
+**Affiliation:**
+DoD Biotechnology High Performance Computing Software Applications Institute
+Defense Health Agency Research & Development
+Fort Detrick, MD 21702-5012
 
 ## 🙏 Acknowledgments
 
 - ProtBert: Protein language model from Rostlab
 - MolFormer: Molecular transformer from IBM Research
 - PyTorch and Hugging Face Transformers for deep learning infrastructure
+- Department of Defense Biotechnology HPC Software Applications Institute
 
-## 📝 TODO
+## 📝 Key Findings
 
-- [ ] Add Jupyter notebook tutorials
-- [ ] Implement ensemble methods
-- [ ] Add attention visualization tools
-- [ ] Support for additional protein encoders (ESM-2, etc.)
-- [ ] Support for additional molecular encoders (ChemBERTa, etc.)
-- [ ] Hyperparameter optimization examples
-- [ ] Docker containerization
+1. **CA-Base outperforms fine-tuning approaches**: Freezing both encoders achieves the best AUROC (0.714), suggesting pre-trained representations are already optimal for this task.
+
+2. **Ligand encoder fine-tuning helps**: CA-Lig slightly outperforms CA-Base in sensitivity and MCC.
+
+3. **Full fine-tuning can hurt performance**: CA-Full shows degraded performance compared to CA-Base, indicating potential overfitting when fine-tuning both encoders.
+
+4. **Cross-attention superior to simpler architectures**: CA models outperform CosSim and Transformer baselines.
+
+5. **Dataset characteristics matter**: The strong performance of frozen encoders may be specific to this dataset size and diversity.
