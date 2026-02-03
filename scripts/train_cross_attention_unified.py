@@ -14,9 +14,8 @@ from pathlib import Path
 from transformers import AutoTokenizer
 
 from src.models.cross_attention_finetune import DTIFineTuneCrossAttention
-from src.utils.data_loader import load_datasets, create_dataloaders
-from src.utils.finetune_data_loader import DTIFineTuneDataset
-from src.utils.finetune_training import train_model_finetune, evaluate_model_finetune
+from src.utils.data_loader import load_datasets, create_dataloaders, DTIFineTuneDataset
+from src.utils.training import train_model_finetune, evaluate_model_finetune
 from src.utils.metrics import print_metrics, evaluate_predictions, report_mean_std
 
 
@@ -89,8 +88,8 @@ def main(args):
     seeds = config['training'].get('seeds', [42, 123, 456, 789, 1024])
     all_metrics = {'Validation': [], 'Test (Unseen Protein)': [], 'Test (Unseen Ligand)': []}
 
-    for seed in seeds:
-        print(f"\n--- Seed {seed} ---")
+    for run_idx, seed in enumerate(seeds, 1):
+        print(f"\n--- Run {run_idx}/{len(seeds)} (seed {seed}) ---")
         torch.manual_seed(seed)
 
         # Initialize model
@@ -155,7 +154,7 @@ def main(args):
         criterion = nn.BCELoss()
 
         # Train
-        save_path = results_dir / f"cross_attention_{freeze_config}_seed{seed}.pth"
+        save_path = results_dir / f"cross_attention_{freeze_config}_run{run_idx}.pth"
         model, history = train_model_finetune(
             model=model,
             train_loader=train_loader,
@@ -171,13 +170,13 @@ def main(args):
         )
 
         history_df = pd.DataFrame(history)
-        history_df.to_csv(results_dir / f"history_{freeze_config}_seed{seed}.csv", index=False)
+        history_df.to_csv(results_dir / f"history_{freeze_config}_run{run_idx}.csv", index=False)
 
         # Evaluate
         val_preds, val_probs, *_ = evaluate_model_finetune(model, val_loader, criterion, device, verbose=False)
         val_df['Predictions'] = val_preds
         val_df['Predictions_Proba'] = val_probs
-        val_df.to_csv(results_dir / f"val_predictions_{freeze_config}_seed{seed}.csv")
+        val_df.to_csv(results_dir / f"val_predictions_{freeze_config}_run{run_idx}.csv")
         val_metrics = evaluate_predictions(val_df)
         all_metrics['Validation'].append(val_metrics)
         print_metrics(val_metrics, "Validation")
@@ -185,7 +184,7 @@ def main(args):
         test_preds, test_probs, *_ = evaluate_model_finetune(model, test_unseen_prot_loader, criterion, device, verbose=False)
         test_unseen_prot_df['Predictions'] = test_preds
         test_unseen_prot_df['Predictions_Proba'] = test_probs
-        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_{freeze_config}_seed{seed}.csv")
+        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_{freeze_config}_run{run_idx}.csv")
         test_prot_metrics = evaluate_predictions(test_unseen_prot_df)
         all_metrics['Test (Unseen Protein)'].append(test_prot_metrics)
         print_metrics(test_prot_metrics, "Test (Unseen Protein)")
@@ -193,7 +192,7 @@ def main(args):
         test_preds, test_probs, *_ = evaluate_model_finetune(model, test_unseen_lig_loader, criterion, device, verbose=False)
         test_unseen_lig_df['Predictions'] = test_preds
         test_unseen_lig_df['Predictions_Proba'] = test_probs
-        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_{freeze_config}_seed{seed}.csv")
+        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_{freeze_config}_run{run_idx}.csv")
         test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
         all_metrics['Test (Unseen Ligand)'].append(test_lig_metrics)
         print_metrics(test_lig_metrics, "Test (Unseen Ligand)")

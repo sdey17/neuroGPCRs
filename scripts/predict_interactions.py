@@ -11,6 +11,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 import torch
 import pandas as pd
+import yaml
 import argparse
 from pathlib import Path
 from transformers import AutoTokenizer
@@ -228,16 +229,10 @@ def main():
         help="Batch size for inference"
     )
     parser.add_argument(
-        "--d_model",
-        type=int,
-        default=512,
-        help="Model dimensionality (must match trained model)"
-    )
-    parser.add_argument(
-        "--n_heads",
-        type=int,
-        default=4,
-        help="Number of attention heads (must match trained model)"
+        "--config",
+        type=str,
+        default="config.yaml",
+        help="Path to config file (d_model, n_heads, dropout read from finetune section)"
     )
 
     args = parser.parse_args()
@@ -253,9 +248,14 @@ def main():
         print("Error: Please provide either --smiles or --smiles_file")
         return
 
+    # Load config for model architecture params
+    with open(args.config, 'r') as f:
+        config = yaml.safe_load(f)
+
     print(f"\nGPCR-Ligand Binding Prediction")
     print(f"  Compounds: {len(smiles_list)}")
     print(f"  Model: {args.model}")
+    print(f"  Config: {args.config}")
     print(f"  GPCR data: {args.data}")
 
     # Load GPCRs
@@ -267,8 +267,9 @@ def main():
         gpcrs_df=gpcrs_df,
         model_path=args.model,
         batch_size=args.batch_size,
-        d_model=args.d_model,
-        n_heads=args.n_heads
+        d_model=config['finetune']['d_model'],
+        n_heads=config['finetune']['n_heads'],
+        dropout=config['finetune']['dropout']
     )
 
     # Apply filters if specified
