@@ -118,37 +118,14 @@ def main(args):
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         print(f"  Trainable parameters: {trainable_params:,}")
 
-        # Setup optimizer with different learning rates for encoders vs task layers
-        param_groups = []
-        if not freeze_protein:
-            param_groups.append({
-                'params': model.protein_encoder.parameters(),
-                'lr': config['finetune']['encoder_lr']
-            })
-        if not freeze_molecule:
-            param_groups.append({
-                'params': model.molecule_encoder.parameters(),
-                'lr': config['finetune']['encoder_lr']
-            })
-
-        param_groups.extend([
-            {'params': model.protein_projector.parameters()},
-            {'params': model.molecule_projector.parameters()},
-            {'params': model.protein_self_attention.parameters()},
-            {'params': model.molecule_self_attention.parameters()},
-            {'params': model.protein_to_mol_attention.parameters()},
-            {'params': model.mol_to_protein_attention.parameters()},
-            {'params': model.classifier.parameters()},
-        ])
-
         optimizer = optim.AdamW(
-            param_groups,
+            model.parameters(),
             lr=config['finetune']['learning_rate'],
             weight_decay=config['finetune']['weight_decay']
         )
 
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='max', factor=0.5, patience=2, verbose=True
+            optimizer, mode='max', factor=0.1, patience=3, verbose=True
         )
 
         criterion = nn.BCELoss()
