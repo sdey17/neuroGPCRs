@@ -1,6 +1,8 @@
 # Configuration file for neuroGPCRs DTI Prediction Models
 
-# Data paths
+# ---------------------------------------------------------------------------
+# Data paths (shared by all models)
+# ---------------------------------------------------------------------------
 data:
   data_dir: "data"
   train_file: "training_set.csv"
@@ -8,111 +10,70 @@ data:
   test_unseen_protein: "test_set_unseen_protein.csv"
   test_unseen_ligand: "test_set_unseen_ligands.csv"
 
-  # Feature files (h5py format) - Set to null if not using pre-computed features
-  protein_features: null  # e.g., "ProtBert_features.h5"
-  molecule_features: null  # e.g., "MolFormer_features.h5"
-
-# Model architecture
-model:
-  # Model type: "cosine", "transformer", or "cross_attention"
-  type: "transformer"
-
-  # Embedding dimensions
-  protein_encoder: "ProtBert"  # Options: ProtBert (1024), ESM (2560)
-  molecule_encoder: "MolFormer"  # Options: MolFormer (768), ChemBERTa (2048)
-
-  # Architecture parameters
-  latent_dim: 1024  # For cosine and transformer models
-  d_model: 512      # For cross-attention model
-  n_heads: 4        # Number of attention heads
-  n_layers: 2       # Number of transformer layers (for transformer model)
-  dropout: 0.1      # Dropout rate
-
-# Training parameters
-training:
-  num_epochs: 50
-  batch_size: 32
-  learning_rate: 0.0001  # 1e-4
-  weight_decay: 0.0      # L2 regularization
-  num_workers: 0         # Number of data loading workers
-
-  # Optimizer
-  optimizer: "AdamW"  # Options: Adam, AdamW, SGD
-
-  # Loss function
-  criterion: "BCELoss"  # Binary Cross Entropy
-
-  # Random seeds (one full training run per seed, results reported as mean ± std)
-  seeds: [42, 123, 456, 789, 1024]
-
-  # Early stopping
-  early_stopping:
-    enabled: true
-    patience: 10
-    min_delta: 0.001
-
-  # Learning rate scheduler
-  scheduler:
-    enabled: false
-    type: "ReduceLROnPlateau"  # Options: ReduceLROnPlateau, StepLR, CosineAnnealingLR
-    factor: 0.1
-    patience: 5
-
-# Device settings
+# ---------------------------------------------------------------------------
+# Device (shared by all models)
+# ---------------------------------------------------------------------------
 device:
-  use_cuda: true  # Set to false to force CPU
-  device_id: 0    # GPU device ID
+  use_cuda: true
 
-# Output settings
+# ---------------------------------------------------------------------------
+# Output (shared by all models)
+# ---------------------------------------------------------------------------
 output:
   results_dir: "results"
-  save_predictions: true
-  save_model: true
-  model_name: "best_model.pth"
 
-# Evaluation
-evaluation:
-  metrics:
-    - accuracy
-    - precision
-    - sensitivity
-    - specificity
-    - mcc
-    - auc
+# ---------------------------------------------------------------------------
+# Shared training settings
+#   seeds    – one full run per seed; final results reported as mean ± std
+#   num_workers – DataLoader workers
+# ---------------------------------------------------------------------------
+training:
+  seeds: [42, 123, 456, 789, 1024]
+  num_workers: 0
 
-  # Save confusion matrix
-  save_confusion_matrix: true
+  # CosSim & Transformer hyperparams (train_cosine.py / train_transformer.py)
+  num_epochs: 50
+  batch_size: 32
+  learning_rate: 0.0001
+  weight_decay: 0.0
 
-# Fine-tuning parameters (for end-to-end training with raw sequences)
+# ---------------------------------------------------------------------------
+# CosSim & Transformer model architecture  (train_cosine.py / train_transformer.py)
+# ---------------------------------------------------------------------------
+model:
+  # Labels used by extract_features to pick the right HDF5 file
+  protein_encoder: "ProtBert"
+  molecule_encoder: "MolFormer"
+
+  # Shared projection dimension
+  latent_dim: 1024
+
+  # Transformer-only parameters (ignored by train_cosine.py)
+  n_heads: 4
+  n_layers: 2
+  dropout: 0.1
+
+# ---------------------------------------------------------------------------
+# Cross-Attention  (train_cross_attention_unified.py)
+#   Encoder freezing is controlled via CLI flags:
+#     --freeze_protein   –  freeze ProtBert
+#     --freeze_molecule  –  freeze MolFormer
+# ---------------------------------------------------------------------------
 finetune:
-  # Pre-trained model names from HuggingFace
   protein_model: "Rostlab/prot_bert"
   molecule_model: "ibm/MolFormer-XL-both-10pct"
 
-  # Architecture parameters for cross-attention
   d_model: 512
   n_heads: 4
   dropout: 0.1
 
-  # Training parameters
   num_epochs: 10
-  batch_size: 8  # Smaller batch size for fine-tuning due to memory constraints
-  learning_rate: 0.00005  # 5e-5 for task-specific layers
-  encoder_lr: 0.00001     # 1e-5 for pre-trained encoders (lower learning rate)
+  batch_size: 8
+  learning_rate: 0.00005   # task-specific layers
+  encoder_lr: 0.00001      # pre-trained encoders (when not frozen)
   weight_decay: 0.01
 
-  # Sequence length limits
   max_protein_len: 1024
   max_molecule_len: 512
 
-  # Encoder freezing
-  freeze_encoders: false  # Set to true to freeze encoder weights and only train cross-attention
-
-  # Early stopping
   early_stopping_patience: 5
-
-# Logging
-logging:
-  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
-  save_logs: true
-  log_file: "training.log"
