@@ -75,7 +75,7 @@ Each CSV should contain the following columns:
 
 ### Pre-computing Embeddings
 
-CosSim and Transformer models require pre-computed embeddings. These are generated automatically if the feature files are missing when you run the training scripts. You can also generate them explicitly:
+CosSim, Transformer, and XGBoost models require pre-computed embeddings. These are generated automatically if the feature files are missing when you run the training scripts. You can also generate them explicitly:
 
 ```bash
 python scripts/generate_embeddings.py \
@@ -98,7 +98,12 @@ python scripts/train_cosine.py --config config.yaml
 python scripts/train_transformer.py --config config.yaml
 ```
 
-#### 3. Cross-Attention Models (Unified Script)
+#### 3. XGBoost Model
+```bash
+python scripts/train_xgb.py --config config.yaml
+```
+
+#### 4. Cross-Attention Models (Unified Script)
 
 The repository provides a **unified training script** that supports all four cross-attention variants:
 
@@ -195,6 +200,7 @@ neuroGPCRs/
 │   ├── models/                 # Model architectures
 │   │   ├── cosine_model.py
 │   │   ├── transformer_model.py
+│   │   ├── xgb_model.py        # Feature extractor for XGBoost
 │   │   └── cross_attention_finetune.py  # Cross-attention with on-the-fly encoding
 │   └── utils/                  # Utility functions
 │       ├── data_loader.py      # Data loading (pre-computed embeddings)
@@ -206,6 +212,7 @@ neuroGPCRs/
 │   ├── generate_embeddings.py  # ProtBert & MolFormer embedding generation
 │   ├── train_cosine.py         # CosSim (auto-generates embeddings if missing)
 │   ├── train_transformer.py    # Transformer (auto-generates embeddings if missing)
+│   ├── train_xgb.py            # XGBoost (auto-generates embeddings if missing)
 │   ├── train_cross_attention_unified.py  # All 4 CA variants
 │   └── predict_interactions.py  # Inference script for new compounds
 ├── examples/                   # Example notebooks and scripts
@@ -293,7 +300,13 @@ Uses bidirectional cross-attention layers to allow proteins and ligands to atten
 - Supports flexible encoder freezing strategies
 
 ### 4. XGBoost Baseline (XGB)
-Traditional machine learning baseline using XGBoost on projected embeddings.
+Projects protein and ligand embeddings to a shared latent space (Linear + ReLU, Xavier-initialised), concatenates them into a 2048-dim feature vector, and trains an XGBoost classifier on top.  The projection network is kept frozen — all learning happens inside XGBoost.
+
+**Key Features:**
+- Traditional ML baseline for comparison
+- Random projection + gradient-boosted trees
+- Same pre-computed embeddings as CosSim / Transformer
+- Hyperparameters (`n_estimators`, `max_depth`, `learning_rate`) tunable in `config.yaml`
 
 ## 📊 Evaluation
 
