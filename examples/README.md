@@ -33,8 +33,8 @@ python scripts/generate_embeddings.py \
 ```
 
 This will create:
-- `prot_bert_features.h5` - Protein embeddings (1024-dim)
-- `MolFormer-XL-both-10pct_features.h5` - Molecule embeddings (768-dim)
+- `ProtBert_features.h5` - Protein embeddings (1024-dim)
+- `MolFormer_features.h5` - Molecule embeddings (768-dim)
 
 ### Advanced Options
 
@@ -69,12 +69,12 @@ Embeddings are saved as HDF5 files with sequences/SMILES as keys:
 import h5py
 
 # Load protein embeddings
-with h5py.File("prot_bert_features.h5", "r") as f:
+with h5py.File("ProtBert_features.h5", "r") as f:
     sequence = "MPIMGSSVYITVELAIAVLAILGNVLVCWAVWLNS..."
     embedding = f[sequence][:]  # Shape: (1024,)
 
 # Load molecule embeddings
-with h5py.File("MolFormer-XL-both-10pct_features.h5", "r") as f:
+with h5py.File("MolFormer_features.h5", "r") as f:
     smiles = "CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1"
     embedding = f[smiles][:]  # Shape: (768,)
 ```

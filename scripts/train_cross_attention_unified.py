@@ -14,11 +14,8 @@ from pathlib import Path
 from transformers import AutoTokenizer
 
 from src.models.cross_attention_finetune import DTIFineTuneCrossAttention
-from src.utils.finetune_data_loader import (
-    load_datasets_for_finetuning,
-    DTIFineTuneDataset,
-    create_finetune_dataloaders
-)
+from src.utils.data_loader import load_datasets, create_dataloaders
+from src.utils.finetune_data_loader import DTIFineTuneDataset
 from src.utils.finetune_training import train_model_finetune, evaluate_model_finetune
 from src.utils.metrics import print_metrics, evaluate_predictions, report_mean_std
 
@@ -47,7 +44,7 @@ def main(args):
 
     # Load datasets (shared across seeds)
     print("\nLoading datasets...")
-    train_df, val_df, test_unseen_prot_df, test_unseen_lig_df = load_datasets_for_finetuning(
+    train_df, val_df, test_unseen_prot_df, test_unseen_lig_df = load_datasets(
         data_dir=config['data']['data_dir'],
         train_file=config['data']['train_file'],
         val_file=config['data']['val_file'],
@@ -77,7 +74,7 @@ def main(args):
         max_molecule_len=config['finetune']['max_molecule_len']
     )
 
-    train_loader, val_loader, test_unseen_prot_loader, test_unseen_lig_loader = create_finetune_dataloaders(
+    train_loader, val_loader, test_unseen_prot_loader, test_unseen_lig_loader = create_dataloaders(
         train_dataset, val_dataset, test_unseen_prot_dataset, test_unseen_lig_dataset,
         batch_size=config['finetune']['batch_size'],
         num_workers=config['training']['num_workers']
