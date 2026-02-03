@@ -253,13 +253,10 @@ def main():
         print("Error: Please provide either --smiles or --smiles_file")
         return
 
-    print(f"\n{'='*60}")
-    print("GPCR-LIGAND BINDING PREDICTION")
-    print(f"{'='*60}")
-    print(f"Number of compounds: {len(smiles_list)}")
-    print(f"Model: {args.model}")
-    print(f"GPCR data: {args.data}")
-    print(f"{'='*60}\n")
+    print(f"\nGPCR-Ligand Binding Prediction")
+    print(f"  Compounds: {len(smiles_list)}")
+    print(f"  Model: {args.model}")
+    print(f"  GPCR data: {args.data}")
 
     # Load GPCRs
     gpcrs_df = load_gpcrs_from_training(args.data)
@@ -289,11 +286,8 @@ def main():
     print(f"Total predictions: {len(results_df)}")
 
     # Show top predictions
-    print(f"\n{'='*60}")
-    print("TOP 10 PREDICTIONS")
-    print(f"{'='*60}")
+    print("\nTop 10 Predictions:")
     print(results_df[['SMILES', 'UniProt', 'Binding_Probability']].head(10).to_string(index=False))
-    print(f"{'='*60}\n")
 
 
 if __name__ == "__main__":

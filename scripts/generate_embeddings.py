@@ -40,12 +40,10 @@ def generate_protein_embeddings(
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print(f"\n{'='*60}")
-    print(f"Generating Protein Embeddings with {model_name}")
-    print(f"{'='*60}")
-    print(f"Device: {device}")
-    print(f"Unique sequences: {len(sequences)}")
-    print(f"Output file: {output_file}")
+    print(f"\nGenerating Protein Embeddings with {model_name}")
+    print(f"  Device: {device}")
+    print(f"  Unique sequences: {len(sequences)}")
+    print(f"  Output file: {output_file}")
 
     # Load model and tokenizer
     print("\nLoading model and tokenizer...")
@@ -124,12 +122,10 @@ def generate_molecule_embeddings(
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    print(f"\n{'='*60}")
-    print(f"Generating Molecule Embeddings with {model_name}")
-    print(f"{'='*60}")
-    print(f"Device: {device}")
-    print(f"Unique SMILES: {len(smiles_list)}")
-    print(f"Output file: {output_file}")
+    print(f"\nGenerating Molecule Embeddings with {model_name}")
+    print(f"  Device: {device}")
+    print(f"  Unique SMILES: {len(smiles_list)}")
+    print(f"  Output file: {output_file}")
 
     # Load model and tokenizer
     print("\nLoading model and tokenizer...")
@@ -239,9 +235,7 @@ def main():
     output_dir.mkdir(exist_ok=True, parents=True)
 
     # Collect unique sequences and SMILES from all data files
-    print(f"\n{'='*60}")
-    print("Loading Data Files")
-    print(f"{'='*60}")
+    print("\nLoading data files...")
 
     all_sequences = set()
     all_smiles = set()
@@ -293,9 +287,7 @@ def main():
     else:
         print("\nSkipping molecule embedding generation")
 
-    print(f"\n{'='*60}")
-    print("✓ Embedding Generation Complete!")
-    print(f"{'='*60}\n")
+    print("\nEmbedding generation complete.")
 
 
 if __name__ == "__main__":

@@ -15,9 +15,7 @@ from src.utils.training import train_model
 def main():
     """Quick start training example."""
 
-    print("="*60)
-    print("neuroGPCRs Quick Start Example")
-    print("="*60)
+    print("\nneuroGPCRs Quick Start Example")
 
     # Configuration
     config = {
@@ -97,9 +95,7 @@ def main():
         verbose=True
     )
 
-    print("\n" + "="*60)
-    print("Training complete!")
-    print("="*60)
+    print("\nTraining complete!")
     print(f"\nModel saved to: quick_start_model.pth")
     print(f"Best validation AUC: {max([h['val_auc'] for h in history]):.4f}")
 

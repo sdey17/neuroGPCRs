@@ -73,28 +73,29 @@ Each CSV should contain the following columns:
 - `SMILES`: SMILES string of the molecule
 - `Label`: Binary label (0 or 1) indicating binding
 
-### Pre-computing Embeddings (Optional)
+### Pre-computing Embeddings
 
-For CosSim, Transformers, and XGBoost models, pre-compute embeddings using ProtBert and MolFormer. See `examples/generate_embeddings.py` for details.
+CosSim and Transformer models require pre-computed embeddings. These are generated automatically if the feature files are missing when you run the training scripts. You can also generate them explicitly:
 
-**Note:** Cross-attention models can compute embeddings on-the-fly, eliminating the need for pre-computed features.
+```bash
+python scripts/generate_embeddings.py \
+    --data_files data/training_set.csv data/validation_set.csv \
+                data/test_set_unseen_protein.csv data/test_set_unseen_ligands.csv
+```
+
+**Note:** Cross-attention models encode sequences on-the-fly and don't need pre-computed embeddings.
 
 ### Training Models
 
 #### 1. Cosine Similarity Model
 ```bash
-python scripts/train_cosine.py \
-    --config config.yaml \
-    --protein_feat /path/to/ProtBert_features.h5 \
-    --mol_feat /path/to/MolFormer_features.h5
+# Embeddings are generated automatically if not already present
+python scripts/train_cosine.py --config config.yaml
 ```
 
 #### 2. Transformer Encoder Model
 ```bash
-python scripts/train_transformer.py \
-    --config config.yaml \
-    --protein_feat /path/to/ProtBert_features.h5 \
-    --mol_feat /path/to/MolFormer_features.h5
+python scripts/train_transformer.py --config config.yaml
 ```
 
 #### 3. Cross-Attention Models (Unified Script)
@@ -194,8 +195,7 @@ neuroGPCRs/
 │   ├── models/                 # Model architectures
 │   │   ├── cosine_model.py
 │   │   ├── transformer_model.py
-│   │   ├── cross_attention_model.py  # For pre-computed embeddings
-│   │   └── cross_attention_finetune.py  # For on-the-fly encoding
+│   │   └── cross_attention_finetune.py  # Cross-attention with on-the-fly encoding
 │   └── utils/                  # Utility functions
 │       ├── data_loader.py      # Data loading (pre-computed embeddings)
 │       ├── finetune_data_loader.py  # Data loading (raw sequences)
@@ -203,9 +203,9 @@ neuroGPCRs/
 │       ├── training.py         # Training utilities
 │       └── finetune_training.py  # Fine-tuning utilities
 ├── scripts/                    # Training and prediction scripts
-│   ├── train_cosine.py
-│   ├── train_transformer.py
-│   ├── train_cross_attention.py
+│   ├── generate_embeddings.py  # ProtBert & MolFormer embedding generation
+│   ├── train_cosine.py         # CosSim (auto-generates embeddings if missing)
+│   ├── train_transformer.py    # Transformer (auto-generates embeddings if missing)
 │   ├── train_cross_attention_unified.py  # All 4 CA variants
 │   └── predict_interactions.py  # Inference script for new compounds
 ├── examples/                   # Example notebooks and scripts
