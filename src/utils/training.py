@@ -263,6 +263,7 @@ def train_epoch_finetune(
             molecule_input_ids=molecule_input_ids,
             molecule_attention_mask=molecule_attention_mask
         )
+        logits = torch.clamp(logits, min=1e-7, max=1-1e-7)
 
         loss = criterion(logits, labels)
         loss.backward()
@@ -338,6 +339,7 @@ def evaluate_model_finetune(
                 molecule_input_ids=molecule_input_ids,
                 molecule_attention_mask=molecule_attention_mask
             )
+            logits = torch.clamp(logits, min=1e-7, max=1-1e-7)
 
             loss = criterion(logits, labels)
 
@@ -418,7 +420,7 @@ def train_model_finetune(
 
         # Step scheduler
         if scheduler is not None:
-            scheduler.step(val_auc)
+            scheduler.step(val_mcc)
 
         # Save history
         history.append({
