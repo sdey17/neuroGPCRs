@@ -38,7 +38,7 @@ training:
   weight_decay: 0.0
 
 # ---------------------------------------------------------------------------
-# CosSim & Transformer model architecture  (train_cosine.py / train_transformer.py)
+# Pre-computed-embedding model architecture  (train_cosine.py / train_transformer.py / train_xgb.py)
 # ---------------------------------------------------------------------------
 model:
   # Labels used by extract_features to pick the right HDF5 file
@@ -52,6 +52,16 @@ model:
   n_heads: 4
   n_layers: 2
   dropout: 0.1
+
+# ---------------------------------------------------------------------------
+# XGBoost  (train_xgb.py)
+#   Projection layer is randomly initialised (Xavier) and frozen;
+#   XGBoost learns on the concatenated projected features.
+# ---------------------------------------------------------------------------
+xgboost:
+  n_estimators: 100
+  max_depth: 6
+  learning_rate: 0.3
 
 # ---------------------------------------------------------------------------
 # Cross-Attention  (train_cross_attention_unified.py)
