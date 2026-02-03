@@ -42,6 +42,9 @@ training:
   # Loss function
   criterion: "BCELoss"  # Binary Cross Entropy
 
+  # Random seeds (one full training run per seed, results reported as mean ± std)
+  seeds: [42, 123, 456, 789, 1024]
+
   # Early stopping
   early_stopping:
     enabled: true
@@ -59,9 +62,6 @@ training:
 device:
   use_cuda: true  # Set to false to force CPU
   device_id: 0    # GPU device ID
-
-# Random seed for reproducibility
-seed: 42
 
 # Output settings
 output:

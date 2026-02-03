@@ -93,9 +93,7 @@ def print_metrics(metrics: Dict[str, float], dataset_name: str = ""):
         dataset_name: Name of the dataset (for display)
     """
     if dataset_name:
-        print(f"\n{'='*60}")
-        print(f"Metrics for {dataset_name}")
-        print(f"{'='*60}")
+        print(f"\nMetrics for {dataset_name}")
 
     print(f"Accuracy:    {metrics['accuracy']:.4f}")
     print(f"Precision:   {metrics['precision']:.4f}")
@@ -108,6 +106,33 @@ def print_metrics(metrics: Dict[str, float], dataset_name: str = ""):
     print(f"\nConfusion Matrix:")
     print(f"  TP: {metrics['tp']:5d}  |  FP: {metrics['fp']:5d}")
     print(f"  FN: {metrics['fn']:5d}  |  TN: {metrics['tn']:5d}")
+
+
+def report_mean_std(all_metrics: Dict[str, List[Dict[str, float]]]):
+    """
+    Report mean ± std across seeds, matching manuscript table format.
+
+    Args:
+        all_metrics: Dict mapping dataset names to lists of metric dicts (one per seed)
+    """
+    metric_keys = ['accuracy', 'sensitivity', 'specificity', 'mcc', 'auc']
+    metric_labels = {
+        'accuracy': 'Accuracy',
+        'sensitivity': 'Sensitivity',
+        'specificity': 'Specificity',
+        'mcc': 'MCC',
+        'auc': 'AUROC'
+    }
+
+    for dataset_name, metrics_list in all_metrics.items():
+        n_seeds = len(metrics_list)
+        print(f"\n{dataset_name} (mean ± std, {n_seeds} seeds):")
+        for key in metric_keys:
+            if key in metrics_list[0]:
+                values = [m[key] for m in metrics_list]
+                mean = np.mean(values)
+                std = np.std(values)
+                print(f"  {metric_labels.get(key, key):15s}: {mean:.3f} ± {std:.3f}")
 
 
 def compare_models(results: Dict[str, Dict[str, float]]) -> pd.DataFrame:
