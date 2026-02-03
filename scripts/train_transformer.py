@@ -88,8 +88,8 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
     seeds = config['training'].get('seeds', [42, 123, 456, 789, 1024])
     all_metrics = {'Validation': [], 'Test (Unseen Protein)': [], 'Test (Unseen Ligand)': []}
 
-    for seed in seeds:
-        print(f"\n--- Seed {seed} ---")
+    for run_idx, seed in enumerate(seeds, 1):
+        print(f"\n--- Run {run_idx}/{len(seeds)} (seed {seed}) ---")
         torch.manual_seed(seed)
 
         # Initialize model
@@ -111,7 +111,7 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
         criterion = nn.BCELoss()
 
         # Train
-        save_path = results_dir / f"transformer_seed{seed}.pth"
+        save_path = results_dir / f"transformer_run{run_idx}.pth"
         model, history = train_model(
             model=model,
             train_loader=train_loader,
@@ -125,13 +125,13 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
         )
 
         history_df = pd.DataFrame(history)
-        history_df.to_csv(results_dir / f"history_transformer_seed{seed}.csv", index=False)
+        history_df.to_csv(results_dir / f"history_transformer_run{run_idx}.csv", index=False)
 
         # Evaluate
         val_preds, val_probs, *_ = evaluate_model(model, val_loader, criterion, device, verbose=False)
         val_df['Predictions'] = val_preds
         val_df['Predictions_Proba'] = val_probs
-        val_df.to_csv(results_dir / f"val_predictions_transformer_seed{seed}.csv")
+        val_df.to_csv(results_dir / f"val_predictions_transformer_run{run_idx}.csv")
         val_metrics = evaluate_predictions(val_df)
         all_metrics['Validation'].append(val_metrics)
         print_metrics(val_metrics, "Validation")
@@ -139,7 +139,7 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
         test_preds, test_probs, *_ = evaluate_model(model, test_unseen_prot_loader, criterion, device, verbose=False)
         test_unseen_prot_df['Predictions'] = test_preds
         test_unseen_prot_df['Predictions_Proba'] = test_probs
-        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_transformer_seed{seed}.csv")
+        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_transformer_run{run_idx}.csv")
         test_prot_metrics = evaluate_predictions(test_unseen_prot_df)
         all_metrics['Test (Unseen Protein)'].append(test_prot_metrics)
         print_metrics(test_prot_metrics, "Test (Unseen Protein)")
@@ -147,7 +147,7 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
         test_preds, test_probs, *_ = evaluate_model(model, test_unseen_lig_loader, criterion, device, verbose=False)
         test_unseen_lig_df['Predictions'] = test_preds
         test_unseen_lig_df['Predictions_Proba'] = test_probs
-        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_transformer_seed{seed}.csv")
+        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_transformer_run{run_idx}.csv")
         test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
         all_metrics['Test (Unseen Ligand)'].append(test_lig_metrics)
         print_metrics(test_lig_metrics, "Test (Unseen Ligand)")
