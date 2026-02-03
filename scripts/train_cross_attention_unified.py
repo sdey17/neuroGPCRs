@@ -42,9 +42,7 @@ def main(args):
     torch.manual_seed(config['seed'])
 
     # Load tokenizers
-    print("\n" + "="*60)
-    print("Loading tokenizers...")
-    print("="*60)
+    print("\nLoading tokenizers...")
 
     protein_model_name = config['finetune']['protein_model']
     molecule_model_name = config['finetune']['molecule_model']
@@ -56,9 +54,7 @@ def main(args):
     molecule_tokenizer = AutoTokenizer.from_pretrained(molecule_model_name, trust_remote_code=True)
 
     # Load datasets
-    print("\n" + "="*60)
-    print("Loading datasets...")
-    print("="*60)
+    print("\nLoading datasets...")
     train_df, val_df, test_unseen_prot_df, test_unseen_lig_df = load_datasets_for_finetuning(
         data_dir=config['data']['data_dir'],
         train_file=config['data']['train_file'],
@@ -105,11 +101,9 @@ def main(args):
     )
 
     # Create model with specified freezing configuration
-    print("\n" + "="*60)
-    print("Initializing Cross-Attention Model...")
+    print("\nInitializing Cross-Attention Model...")
     print(f"Protein Encoder: {'FROZEN' if freeze_protein else 'TRAINABLE'}")
     print(f"Molecule Encoder: {'FROZEN' if freeze_molecule else 'TRAINABLE'}")
-    print("="*60)
 
     # Determine if both are frozen (use single freeze_encoders flag)
     freeze_both = freeze_protein and freeze_molecule
@@ -191,9 +185,7 @@ def main(args):
     criterion = nn.BCELoss()
 
     # Training
-    print("\n" + "="*60)
-    print("Starting Training...")
-    print("="*60)
+    print("\nStarting Training...")
 
     results_dir = Path(config['output']['results_dir'])
     results_dir.mkdir(exist_ok=True)
@@ -221,9 +213,7 @@ def main(args):
     history_df.to_csv(results_dir / f"history_{freeze_config}.csv", index=False)
 
     # Final evaluation
-    print("\n" + "="*60)
-    print("Final Evaluation")
-    print("="*60)
+    print("\nFinal Evaluation")
 
     # Validation set
     val_preds, val_probs, val_loss, val_acc, val_prec, val_rec, val_spec, val_mcc, val_auc = evaluate_model_finetune(
@@ -261,9 +251,7 @@ def main(args):
     test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
     print_metrics(test_lig_metrics)
 
-    print("\n" + "="*60)
-    print("Training Complete!")
-    print("="*60)
+    print("\nTraining Complete!")
     print(f"Model saved to: {save_path}")
     print(f"Configuration: {freeze_config}")
 
@@ -291,12 +279,8 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    print("\n" + "="*60)
-    print("CROSS-ATTENTION DTI MODEL - UNIFIED TRAINING")
-    print("="*60)
-    print(f"Configuration:")
+    print(f"\nCross-Attention Model Configuration:")
     print(f"  Freeze Protein Encoder: {args.freeze_protein}")
     print(f"  Freeze Molecule Encoder: {args.freeze_molecule}")
-    print("="*60)
 
     main(args)
