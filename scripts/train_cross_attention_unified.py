@@ -20,7 +20,7 @@ from src.utils.finetune_data_loader import (
     create_finetune_dataloaders
 )
 from src.utils.finetune_training import train_model_finetune, evaluate_model_finetune
-from src.utils.metrics import print_metrics, evaluate_predictions
+from src.utils.metrics import print_metrics, evaluate_predictions, report_mean_std
 
 
 def main(args):
@@ -30,7 +30,6 @@ def main(args):
     with open(args.config, 'r') as f:
         config = yaml.safe_load(f)
 
-    # Override config with command line arguments
     freeze_protein = args.freeze_protein
     freeze_molecule = args.freeze_molecule
 
@@ -38,22 +37,15 @@ def main(args):
     device = torch.device("cuda" if torch.cuda.is_available() and config['device']['use_cuda'] else "cpu")
     print(f"Using device: {device}")
 
-    # Set random seed
-    torch.manual_seed(config['seed'])
-
-    # Load tokenizers
+    # Load tokenizers (shared across seeds)
     print("\nLoading tokenizers...")
-
     protein_model_name = config['finetune']['protein_model']
     molecule_model_name = config['finetune']['molecule_model']
 
-    print(f"Protein tokenizer: {protein_model_name}")
     protein_tokenizer = AutoTokenizer.from_pretrained(protein_model_name, do_lower_case=False)
-
-    print(f"Molecule tokenizer: {molecule_model_name}")
     molecule_tokenizer = AutoTokenizer.from_pretrained(molecule_model_name, trust_remote_code=True)
 
-    # Load datasets
+    # Load datasets (shared across seeds)
     print("\nLoading datasets...")
     train_df, val_df, test_unseen_prot_df, test_unseen_lig_df = load_datasets_for_finetuning(
         data_dir=config['data']['data_dir'],
@@ -63,197 +55,154 @@ def main(args):
         test_unseen_lig_file=config['data']['test_unseen_ligand']
     )
 
-    # Create datasets
+    # Create datasets and dataloaders (shared across seeds)
     train_dataset = DTIFineTuneDataset(
-        train_df,
-        protein_tokenizer,
-        molecule_tokenizer,
+        train_df, protein_tokenizer, molecule_tokenizer,
         max_protein_len=config['finetune']['max_protein_len'],
         max_molecule_len=config['finetune']['max_molecule_len']
     )
     val_dataset = DTIFineTuneDataset(
-        val_df,
-        protein_tokenizer,
-        molecule_tokenizer,
+        val_df, protein_tokenizer, molecule_tokenizer,
         max_protein_len=config['finetune']['max_protein_len'],
         max_molecule_len=config['finetune']['max_molecule_len']
     )
     test_unseen_prot_dataset = DTIFineTuneDataset(
-        test_unseen_prot_df,
-        protein_tokenizer,
-        molecule_tokenizer,
+        test_unseen_prot_df, protein_tokenizer, molecule_tokenizer,
         max_protein_len=config['finetune']['max_protein_len'],
         max_molecule_len=config['finetune']['max_molecule_len']
     )
     test_unseen_lig_dataset = DTIFineTuneDataset(
-        test_unseen_lig_df,
-        protein_tokenizer,
-        molecule_tokenizer,
+        test_unseen_lig_df, protein_tokenizer, molecule_tokenizer,
         max_protein_len=config['finetune']['max_protein_len'],
         max_molecule_len=config['finetune']['max_molecule_len']
     )
 
-    # Create dataloaders
     train_loader, val_loader, test_unseen_prot_loader, test_unseen_lig_loader = create_finetune_dataloaders(
         train_dataset, val_dataset, test_unseen_prot_dataset, test_unseen_lig_dataset,
         batch_size=config['finetune']['batch_size'],
         num_workers=config['training']['num_workers']
     )
 
-    # Create model with specified freezing configuration
-    print("\nInitializing Cross-Attention Model...")
-    print(f"Protein Encoder: {'FROZEN' if freeze_protein else 'TRAINABLE'}")
-    print(f"Molecule Encoder: {'FROZEN' if freeze_molecule else 'TRAINABLE'}")
-
-    # Determine if both are frozen (use single freeze_encoders flag)
-    freeze_both = freeze_protein and freeze_molecule
-
-    model = DTIFineTuneCrossAttention(
-        protein_model_name=protein_model_name,
-        molecule_model_name=molecule_model_name,
-        d_model=config['finetune']['d_model'],
-        n_heads=config['finetune']['n_heads'],
-        dropout=config['finetune']['dropout'],
-        freeze_encoders=freeze_both
-    ).to(device)
-
-    # Apply individual freezing if not both frozen
-    if not freeze_both:
-        if freeze_protein:
-            print("Freezing protein encoder weights...")
-            for param in model.protein_encoder.parameters():
-                param.requires_grad = False
-        if freeze_molecule:
-            print("Freezing molecule encoder weights...")
-            for param in model.molecule_encoder.parameters():
-                param.requires_grad = False
-
-    # Print model info
-    params_dict = model.get_num_params()
-    print("\nModel Parameters:")
-    print(f"  Protein Encoder: {params_dict['protein_encoder']:,}")
-    print(f"  Molecule Encoder: {params_dict['molecule_encoder']:,}")
-    print(f"  Self-Attention: {params_dict['self_attention']:,}")
-    print(f"  Cross-Attention: {params_dict['cross_attention']:,}")
-    print(f"  Classifier: {params_dict['classifier']:,}")
-    print(f"  Total: {params_dict['total']:,}")
-
-    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"  Trainable: {trainable_params:,}")
-
-    # Setup optimizer with different learning rates based on freezing configuration
-    param_groups = []
-
-    if not freeze_protein:
-        param_groups.append({
-            'params': model.protein_encoder.parameters(),
-            'lr': config['finetune']['encoder_lr']
-        })
-
-    if not freeze_molecule:
-        param_groups.append({
-            'params': model.molecule_encoder.parameters(),
-            'lr': config['finetune']['encoder_lr']
-        })
-
-    # Always train task-specific layers
-    param_groups.extend([
-        {'params': model.protein_projector.parameters()},
-        {'params': model.molecule_projector.parameters()},
-        {'params': model.protein_self_attention.parameters()},
-        {'params': model.molecule_self_attention.parameters()},
-        {'params': model.protein_to_mol_attention.parameters()},
-        {'params': model.mol_to_protein_attention.parameters()},
-        {'params': model.classifier.parameters()},
-    ])
-
-    optimizer = optim.AdamW(
-        param_groups,
-        lr=config['finetune']['learning_rate'],
-        weight_decay=config['finetune']['weight_decay']
-    )
-
-    # Learning rate scheduler
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer,
-        mode='max',
-        factor=0.5,
-        patience=2,
-        verbose=True
-    )
-
-    criterion = nn.BCELoss()
-
-    # Training
-    print("\nStarting Training...")
-
     results_dir = Path(config['output']['results_dir'])
     results_dir.mkdir(exist_ok=True)
 
-    # Create descriptive model name based on freezing configuration
     freeze_config = f"prot{'_frozen' if freeze_protein else '_train'}_mol{'_frozen' if freeze_molecule else '_train'}"
-    save_path = results_dir / f"cross_attention_{freeze_config}.pth"
 
-    model, history = train_model_finetune(
-        model=model,
-        train_loader=train_loader,
-        val_loader=val_loader,
-        criterion=criterion,
-        optimizer=optimizer,
-        scheduler=scheduler,
-        device=device,
-        num_epochs=config['finetune']['num_epochs'],
-        save_path=str(save_path),
-        verbose=True,
-        early_stopping_patience=config['finetune']['early_stopping_patience']
-    )
+    # Multi-seed training
+    seeds = config['training'].get('seeds', [42, 123, 456, 789, 1024])
+    all_metrics = {'Validation': [], 'Test (Unseen Protein)': [], 'Test (Unseen Ligand)': []}
 
-    # Save training history
-    history_df = pd.DataFrame(history)
-    history_df.to_csv(results_dir / f"history_{freeze_config}.csv", index=False)
+    for seed in seeds:
+        print(f"\n--- Seed {seed} ---")
+        torch.manual_seed(seed)
 
-    # Final evaluation
-    print("\nFinal Evaluation")
+        # Initialize model
+        print(f"  Protein Encoder: {'FROZEN' if freeze_protein else 'TRAINABLE'}")
+        print(f"  Molecule Encoder: {'FROZEN' if freeze_molecule else 'TRAINABLE'}")
 
-    # Validation set
-    val_preds, val_probs, val_loss, val_acc, val_prec, val_rec, val_spec, val_mcc, val_auc = evaluate_model_finetune(
-        model, val_loader, criterion, device, verbose=False
-    )
-    val_df['Predictions'] = val_preds
-    val_df['Predictions_Proba'] = val_probs
-    val_df.to_csv(results_dir / f"val_predictions_{freeze_config}.csv")
+        freeze_both = freeze_protein and freeze_molecule
+        model = DTIFineTuneCrossAttention(
+            protein_model_name=protein_model_name,
+            molecule_model_name=molecule_model_name,
+            d_model=config['finetune']['d_model'],
+            n_heads=config['finetune']['n_heads'],
+            dropout=config['finetune']['dropout'],
+            freeze_encoders=freeze_both
+        ).to(device)
 
-    print("\nValidation Set:")
-    val_metrics = evaluate_predictions(val_df)
-    print_metrics(val_metrics)
+        # Apply individual freezing if not both frozen
+        if not freeze_both:
+            if freeze_protein:
+                for param in model.protein_encoder.parameters():
+                    param.requires_grad = False
+            if freeze_molecule:
+                for param in model.molecule_encoder.parameters():
+                    param.requires_grad = False
 
-    # Test set (unseen protein)
-    test_preds, test_probs, test_loss, test_acc, test_prec, test_rec, test_spec, test_mcc, test_auc = evaluate_model_finetune(
-        model, test_unseen_prot_loader, criterion, device, verbose=False
-    )
-    test_unseen_prot_df['Predictions'] = test_preds
-    test_unseen_prot_df['Predictions_Proba'] = test_probs
-    test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_{freeze_config}.csv")
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        print(f"  Trainable parameters: {trainable_params:,}")
 
-    print("\nTest Set (Unseen Protein):")
-    test_prot_metrics = evaluate_predictions(test_unseen_prot_df)
-    print_metrics(test_prot_metrics)
+        # Setup optimizer with different learning rates for encoders vs task layers
+        param_groups = []
+        if not freeze_protein:
+            param_groups.append({
+                'params': model.protein_encoder.parameters(),
+                'lr': config['finetune']['encoder_lr']
+            })
+        if not freeze_molecule:
+            param_groups.append({
+                'params': model.molecule_encoder.parameters(),
+                'lr': config['finetune']['encoder_lr']
+            })
 
-    # Test set (unseen ligand)
-    test_preds, test_probs, test_loss, test_acc, test_prec, test_rec, test_spec, test_mcc, test_auc = evaluate_model_finetune(
-        model, test_unseen_lig_loader, criterion, device, verbose=False
-    )
-    test_unseen_lig_df['Predictions'] = test_preds
-    test_unseen_lig_df['Predictions_Proba'] = test_probs
-    test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_{freeze_config}.csv")
+        param_groups.extend([
+            {'params': model.protein_projector.parameters()},
+            {'params': model.molecule_projector.parameters()},
+            {'params': model.protein_self_attention.parameters()},
+            {'params': model.molecule_self_attention.parameters()},
+            {'params': model.protein_to_mol_attention.parameters()},
+            {'params': model.mol_to_protein_attention.parameters()},
+            {'params': model.classifier.parameters()},
+        ])
 
-    print("\nTest Set (Unseen Ligand):")
-    test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
-    print_metrics(test_lig_metrics)
+        optimizer = optim.AdamW(
+            param_groups,
+            lr=config['finetune']['learning_rate'],
+            weight_decay=config['finetune']['weight_decay']
+        )
 
-    print("\nTraining Complete!")
-    print(f"Model saved to: {save_path}")
-    print(f"Configuration: {freeze_config}")
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='max', factor=0.5, patience=2, verbose=True
+        )
+
+        criterion = nn.BCELoss()
+
+        # Train
+        save_path = results_dir / f"cross_attention_{freeze_config}_seed{seed}.pth"
+        model, history = train_model_finetune(
+            model=model,
+            train_loader=train_loader,
+            val_loader=val_loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            device=device,
+            num_epochs=config['finetune']['num_epochs'],
+            save_path=str(save_path),
+            verbose=True,
+            early_stopping_patience=config['finetune']['early_stopping_patience']
+        )
+
+        history_df = pd.DataFrame(history)
+        history_df.to_csv(results_dir / f"history_{freeze_config}_seed{seed}.csv", index=False)
+
+        # Evaluate
+        val_preds, val_probs, *_ = evaluate_model_finetune(model, val_loader, criterion, device, verbose=False)
+        val_df['Predictions'] = val_preds
+        val_df['Predictions_Proba'] = val_probs
+        val_df.to_csv(results_dir / f"val_predictions_{freeze_config}_seed{seed}.csv")
+        val_metrics = evaluate_predictions(val_df)
+        all_metrics['Validation'].append(val_metrics)
+        print_metrics(val_metrics, "Validation")
+
+        test_preds, test_probs, *_ = evaluate_model_finetune(model, test_unseen_prot_loader, criterion, device, verbose=False)
+        test_unseen_prot_df['Predictions'] = test_preds
+        test_unseen_prot_df['Predictions_Proba'] = test_probs
+        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_{freeze_config}_seed{seed}.csv")
+        test_prot_metrics = evaluate_predictions(test_unseen_prot_df)
+        all_metrics['Test (Unseen Protein)'].append(test_prot_metrics)
+        print_metrics(test_prot_metrics, "Test (Unseen Protein)")
+
+        test_preds, test_probs, *_ = evaluate_model_finetune(model, test_unseen_lig_loader, criterion, device, verbose=False)
+        test_unseen_lig_df['Predictions'] = test_preds
+        test_unseen_lig_df['Predictions_Proba'] = test_probs
+        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_{freeze_config}_seed{seed}.csv")
+        test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
+        all_metrics['Test (Unseen Ligand)'].append(test_lig_metrics)
+        print_metrics(test_lig_metrics, "Test (Unseen Ligand)")
+
+    # Report mean ± std across all seeds
+    report_mean_std(all_metrics)
 
 
 if __name__ == "__main__":
