@@ -105,8 +105,8 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
     seeds = config['training'].get('seeds', [42, 123, 456, 789, 1024])
     all_metrics = {'Validation': [], 'Test (Unseen Protein)': [], 'Test (Unseen Ligand)': []}
 
-    for seed in seeds:
-        print(f"\n--- Seed {seed} ---")
+    for run_idx, seed in enumerate(seeds, 1):
+        print(f"\n--- Run {run_idx}/{len(seeds)} (seed {seed}) ---")
         torch.manual_seed(seed)
 
         # Initialize feature extractor (random projection, not trained)
@@ -139,13 +139,13 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
             verbose=False
         )
 
-        xgb_model.save_model(str(results_dir / f"xgb_seed{seed}.json"))
+        xgb_model.save_model(str(results_dir / f"xgb_run{run_idx}.json"))
 
         # Evaluate — Validation
         val_probs = xgb_model.predict_proba(val_features)[:, 1]
         val_df['Predictions'] = (val_probs > 0.5).astype(int)
         val_df['Predictions_Proba'] = val_probs
-        val_df.to_csv(results_dir / f"val_predictions_xgb_seed{seed}.csv")
+        val_df.to_csv(results_dir / f"val_predictions_xgb_run{run_idx}.csv")
         val_metrics = evaluate_predictions(val_df)
         all_metrics['Validation'].append(val_metrics)
         print_metrics(val_metrics, "Validation")
@@ -154,7 +154,7 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
         test_prot_probs = xgb_model.predict_proba(test_prot_features)[:, 1]
         test_unseen_prot_df['Predictions'] = (test_prot_probs > 0.5).astype(int)
         test_unseen_prot_df['Predictions_Proba'] = test_prot_probs
-        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_xgb_seed{seed}.csv")
+        test_unseen_prot_df.to_csv(results_dir / f"test_unseen_protein_xgb_run{run_idx}.csv")
         test_prot_metrics = evaluate_predictions(test_unseen_prot_df)
         all_metrics['Test (Unseen Protein)'].append(test_prot_metrics)
         print_metrics(test_prot_metrics, "Test (Unseen Protein)")
@@ -163,7 +163,7 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
         test_lig_probs = xgb_model.predict_proba(test_lig_features)[:, 1]
         test_unseen_lig_df['Predictions'] = (test_lig_probs > 0.5).astype(int)
         test_unseen_lig_df['Predictions_Proba'] = test_lig_probs
-        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_xgb_seed{seed}.csv")
+        test_unseen_lig_df.to_csv(results_dir / f"test_unseen_ligand_xgb_run{run_idx}.csv")
         test_lig_metrics = evaluate_predictions(test_unseen_lig_df)
         all_metrics['Test (Unseen Ligand)'].append(test_lig_metrics)
         print_metrics(test_lig_metrics, "Test (Unseen Ligand)")

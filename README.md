@@ -137,7 +137,7 @@ Once you have a trained model, you can predict GPCR-ligand interactions for new 
 ```bash
 python scripts/predict_interactions.py \
     --smiles "CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1" \
-    --model results/cross_attention_prot_frozen_mol_frozen.pth \
+    --model results/cross_attention_prot_frozen_mol_frozen_seed42.pth \
     --output my_predictions.csv \
     --top_k 10
 ```
@@ -154,7 +154,7 @@ EOF
 # Run predictions
 python scripts/predict_interactions.py \
     --smiles_file compounds.txt \
-    --model results/cross_attention_prot_frozen_mol_frozen.pth \
+    --model results/cross_attention_prot_frozen_mol_frozen_seed42.pth \
     --output batch_predictions.csv \
     --threshold 0.5
 ```
@@ -216,6 +216,8 @@ neuroGPCRs/
 │   ├── train_cross_attention_unified.py  # All 4 CA variants
 │   └── predict_interactions.py  # Inference script for new compounds
 ├── examples/                   # Example notebooks and scripts
+│   ├── README.md               # Examples guide
+│   ├── quick_start.py          # Minimal training example
 │   ├── predict_example.py      # Example prediction usage
 │   └── example_smiles.txt      # Example SMILES input file
 ├── manuscript/                 # Research manuscript

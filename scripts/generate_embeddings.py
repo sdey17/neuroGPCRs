@@ -265,7 +265,7 @@ def main():
 
     # Generate protein embeddings
     if not args.skip_proteins:
-        protein_output = output_dir / f"{args.protein_model.split('/')[-1]}_features.h5"
+        protein_output = output_dir / "ProtBert_features.h5"
         generate_protein_embeddings(
             sequences=all_sequences,
             model_name=args.protein_model,
@@ -277,7 +277,7 @@ def main():
 
     # Generate molecule embeddings
     if not args.skip_molecules:
-        molecule_output = output_dir / f"{args.molecule_model.split('/')[-1]}_features.h5"
+        molecule_output = output_dir / "MolFormer_features.h5"
         generate_molecule_embeddings(
             smiles_list=all_smiles,
             model_name=args.molecule_model,
