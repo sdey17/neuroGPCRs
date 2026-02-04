@@ -46,9 +46,7 @@ venv.bak/
 *.ckpt
 
 # Data files (large files)
-*.h5
 *.hdf5
-*.csv
 *.tsv
 *.pkl
 *.pickle
