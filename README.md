@@ -213,11 +213,6 @@ neuroGPCRs/
 │   ├── train_xgb.py            # XGBoost (auto-generates embeddings if missing)
 │   ├── train_cross_attention_unified.py  # All 4 CA variants
 │   └── predict_interactions.py  # Inference script for new compounds
-├── examples/                   # Example notebooks and scripts
-│   ├── README.md               # Examples guide
-│   ├── quick_start.py          # Minimal training example
-│   ├── predict_example.py      # Example prediction usage
-│   └── example_smiles.txt      # Example SMILES input file
 ├── manuscript/                 # Research manuscript
 │   ├── Main_text.docx
 │   └── Supplementary_info.docx
