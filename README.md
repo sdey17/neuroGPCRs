@@ -137,7 +137,7 @@ Once you have a trained model, you can predict GPCR-ligand interactions for new 
 ```bash
 python scripts/predict_interactions.py \
     --smiles "CCOCc1sc(NC(=O)c2ccco2)nc1-c1ccccc1" \
-    --model results/cross_attention_prot_frozen_mol_frozen_seed42.pth \
+    --model results/cross_attention_prot_frozen_mol_frozen_run1.pth \
     --output my_predictions.csv \
     --top_k 10
 ```
@@ -154,7 +154,7 @@ EOF
 # Run predictions
 python scripts/predict_interactions.py \
     --smiles_file compounds.txt \
-    --model results/cross_attention_prot_frozen_mol_frozen_seed42.pth \
+    --model results/cross_attention_prot_frozen_mol_frozen_run1.pth \
     --output batch_predictions.csv \
     --threshold 0.5
 ```
@@ -203,11 +203,9 @@ neuroGPCRs/
 │   │   ├── xgb_model.py        # Feature extractor for XGBoost
 │   │   └── cross_attention_finetune.py  # Cross-attention with on-the-fly encoding
 │   └── utils/                  # Utility functions
-│       ├── data_loader.py      # Data loading (pre-computed embeddings)
-│       ├── finetune_data_loader.py  # Data loading (raw sequences)
+│       ├── data_loader.py      # Data loading (pre-computed + raw sequences)
 │       ├── metrics.py          # Evaluation metrics
-│       ├── training.py         # Training utilities
-│       └── finetune_training.py  # Fine-tuning utilities
+│       └── training.py         # Training + fine-tuning utilities
 ├── scripts/                    # Training and prediction scripts
 │   ├── generate_embeddings.py  # ProtBert & MolFormer embedding generation
 │   ├── train_cosine.py         # CosSim (auto-generates embeddings if missing)
@@ -215,11 +213,6 @@ neuroGPCRs/
 │   ├── train_xgb.py            # XGBoost (auto-generates embeddings if missing)
 │   ├── train_cross_attention_unified.py  # All 4 CA variants
 │   └── predict_interactions.py  # Inference script for new compounds
-├── examples/                   # Example notebooks and scripts
-│   ├── README.md               # Examples guide
-│   ├── quick_start.py          # Minimal training example
-│   ├── predict_example.py      # Example prediction usage
-│   └── example_smiles.txt      # Example SMILES input file
 ├── manuscript/                 # Research manuscript
 │   ├── Main_text.docx
 │   └── Supplementary_info.docx
@@ -252,8 +245,8 @@ finetune:
   dropout: 0.1
   num_epochs: 10
   batch_size: 8
-  learning_rate: 0.00005  # Task-specific layers
-  encoder_lr: 0.00001     # Pre-trained encoders (if trainable)
+  learning_rate: 0.00001
+  weight_decay: 0.00001
 ```
 
 ## 📚 Model Architectures
