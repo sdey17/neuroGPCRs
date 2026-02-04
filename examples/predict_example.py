@@ -22,7 +22,7 @@ gpcrs_df = load_gpcrs_from_training("../data/training_set.csv")
 
 # Make predictions
 # NOTE: You need to provide the path to your trained model
-model_path = "../results/cross_attention_prot_frozen_mol_frozen_seed42.pth"  # Adjust this path
+model_path = "../results/cross_attention_prot_frozen_mol_frozen_run1.pth"  # Adjust this path
 
 results_df = predict_interactions(
     smiles_list=smiles_list,
