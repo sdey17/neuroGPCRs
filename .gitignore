@@ -51,9 +51,6 @@ venv.bak/
 *.pkl
 *.pickle
 
-# Except example data
-!examples/*.csv
-
 # Results and logs
 results/
 logs/
