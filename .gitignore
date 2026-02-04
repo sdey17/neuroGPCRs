@@ -51,6 +51,9 @@ venv.bak/
 *.pkl
 *.pickle
 
+# Keep the input datasets
+!data/*.csv
+
 # Results and logs
 results/
 logs/
