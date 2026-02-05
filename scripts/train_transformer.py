@@ -121,6 +121,7 @@ def main(config_path: str = "config.yaml", protein_feat: str = None, mol_feat: s
             device=device,
             num_epochs=config['training']['num_epochs'],
             save_path=str(save_path),
+            early_stopping_patience=config['training']['early_stopping_patience'],
             verbose=True
         )
 

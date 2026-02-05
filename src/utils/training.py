@@ -144,10 +144,11 @@ def train_model(
     device: torch.device,
     num_epochs: int = 50,
     save_path: str = "best_model.pth",
+    early_stopping_patience: int = 5,
     verbose: bool = True
 ) -> Tuple[nn.Module, List[dict]]:
     """
-    Complete training loop with validation.
+    Complete training loop with validation and early stopping.
 
     Args:
         model: PyTorch model to train
@@ -158,12 +159,14 @@ def train_model(
         device: Device to run on
         num_epochs: Number of training epochs
         save_path: Path to save best model
+        early_stopping_patience: Number of epochs without val AUC improvement before stopping
         verbose: Whether to print progress
 
     Returns:
         Tuple of (best_model, history)
     """
     best_val_auc = 0
+    patience_counter = 0
     history = []
 
     for epoch in range(num_epochs):
@@ -199,12 +202,23 @@ def train_model(
             print(f"Val   - Loss: {val_loss:.3f}, Acc: {val_acc:.3f}, AUC: {val_auc:.3f}, "
                   f"Sens: {val_rec:.3f}, Spec: {val_spec:.3f}, MCC: {val_mcc:.3f}")
 
-        # Save best model
+        # Save best model and early stopping
         if val_auc > best_val_auc:
             best_val_auc = val_auc
             torch.save(model.state_dict(), save_path)
+            patience_counter = 0
             if verbose:
                 print(f"New best model saved! Val AUC: {best_val_auc:.4f}")
+        else:
+            patience_counter += 1
+            if verbose:
+                print(f"No improvement. Patience: {patience_counter}/{early_stopping_patience}")
+
+        # Early stopping
+        if patience_counter >= early_stopping_patience:
+            if verbose:
+                print(f"\nEarly stopping triggered after {epoch+1} epochs")
+            break
 
     # Load best model
     model.load_state_dict(torch.load(save_path))
