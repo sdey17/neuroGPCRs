@@ -50,6 +50,7 @@ venv.bak/
 *.tsv
 *.pkl
 *.pickle
+*.csv
 
 # Keep the input datasets
 !data/*.csv
