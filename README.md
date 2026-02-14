@@ -177,7 +177,7 @@ CCOCc1sc...,P30542,MPPSISAFQAAYIGIEVLIALVSVPGNVLVIWAVK...,0.7891
 CCOCc1sc...,P28222,MEEPGAQCAPPPPAGSETWVPQANLSSAPSQNCSA...,0.7234
 ```
 
-## 🔧 Configuration
+## Configuration
 
 Edit `config.yaml` to customize:
 - Data paths and file names
@@ -200,7 +200,7 @@ finetune:
   weight_decay: 0.00001
 ```
 
-## 📚 Model Architectures
+## Model Architectures
 
 ### 1. Cosine Similarity Model (CosSim)
 Projects protein and ligand embeddings to a shared 1024-dimensional space using linear layers, then computes cosine similarity as the binding score.
@@ -269,7 +269,7 @@ Models are evaluated on three test scenarios:
 - Matthews Correlation Coefficient (MCC)
 - Area Under ROC Curve (AUROC)
 
-## 🔬 Citation
+## Citation
 
 If you use this code in your research, please cite:
 
