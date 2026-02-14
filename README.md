@@ -20,28 +20,18 @@ G protein-coupled receptors (GPCRs) are therapeutic targets for over 30% of appr
 
 All models leverage pre-trained language models (ProtBert for proteins, MolFormer for ligands) and are evaluated on multiple challenging scenarios including unseen proteins and unseen ligands.
 
-## 📊 Performance (Off-Target Profiling Task)
-
-| Model | Accuracy | Sensitivity | Specificity | MCC | AUROC |
-|-------|----------|-------------|-------------|-----|-------|
-| **CosSim** | 0.785 ± 0.018 | 0.374 ± 0.025 | 0.912 ± 0.025 | 0.338 ± 0.041 | 0.640 ± 0.012 |
-| **Transformers** | 0.744 ± 0.017 | 0.472 ± 0.053 | 0.827 ± 0.021 | 0.296 ± 0.048 | 0.632 ± 0.013 |
-| **CA-Base** | **0.795 ± 0.010** | 0.494 ± 0.041 | **0.888 ± 0.018** | 0.403 ± 0.029 | **0.714 ± 0.017** |
-| **CA-Lig** | 0.794 ± 0.021 | **0.506 ± 0.037** | 0.882 ± 0.024 | **0.407 ± 0.051** | 0.698 ± 0.014 |
-| **CA-Prot** | 0.670 ± 0.028 | 0.331 ± 0.102 | 0.774 ± 0.064 | 0.103 ± 0.040 | 0.553 ± 0.025 |
-| **CA-Full** | 0.709 ± 0.009 | 0.410 ± 0.044 | 0.802 ± 0.025 | 0.208 ± 0.014 | 0.606 ± 0.010 |
-| **XGB** | 0.754 ± 0.014 | 0.353 ± 0.031 | 0.878 ± 0.013 | 0.257 ± 0.042 | 0.623 ± 0.011 |
 
 **Key Finding**: CA-Base (frozen encoders) achieves the best performance, suggesting that task-specific training of pre-trained encoders may lead to overfitting for this dataset.
 
-## 🔬 Dataset
+## Dataset
 
+(Will be made available following the manuscript publication)
 - **Training Set**: 119 GPCRs with binding data
 - **Validation Set**: Random split from training distribution
 - **Test Set (Unseen Proteins)**: 9 GPCRs not seen during training
 - **Test Set (Unseen Ligands)**: Ligands not seen during training
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Installation
 
@@ -187,45 +177,6 @@ CCOCc1sc...,P30542,MPPSISAFQAAYIGIEVLIALVSVPGNVLVIWAVK...,0.7891
 CCOCc1sc...,P28222,MEEPGAQCAPPPPAGSETWVPQANLSSAPSQNCSA...,0.7234
 ```
 
-## 📁 Repository Structure
-
-```
-neuroGPCRs/
-├── data/                       # Data directory
-│   ├── training_set.csv
-│   ├── validation_set.csv
-│   ├── test_set_unseen_protein.csv
-│   └── test_set_unseen_ligands.csv
-├── src/                        # Source code
-│   ├── models/                 # Model architectures
-│   │   ├── cosine_model.py
-│   │   ├── transformer_model.py
-│   │   ├── xgb_model.py        # Feature extractor for XGBoost
-│   │   └── cross_attention_finetune.py  # Cross-attention with on-the-fly encoding
-│   └── utils/                  # Utility functions
-│       ├── data_loader.py      # Data loading (pre-computed + raw sequences)
-│       ├── metrics.py          # Evaluation metrics
-│       └── training.py         # Training + fine-tuning utilities
-├── scripts/                    # Training and prediction scripts
-│   ├── generate_embeddings.py  # ProtBert & MolFormer embedding generation
-│   ├── train_cosine.py         # CosSim (auto-generates embeddings if missing)
-│   ├── train_transformer.py    # Transformer (auto-generates embeddings if missing)
-│   ├── train_xgb.py            # XGBoost (auto-generates embeddings if missing)
-│   ├── train_cross_attention_unified.py  # All 4 CA variants
-│   └── predict_interactions.py  # Inference script for new compounds
-├── manuscript/                 # Research manuscript
-│   ├── Main_text.docx
-│   └── Supplementary_info.docx
-├── old_scripts/               # Original implementation (reference)
-├── results/                   # Output directory for results
-├── tests/                     # Unit tests
-├── docs/                      # Documentation
-├── config.yaml                # Configuration file
-├── requirements.txt           # Python dependencies
-├── README.md                  # This file
-└── LICENSE                    # MIT License
-```
-
 ## 🔧 Configuration
 
 Edit `config.yaml` to customize:
@@ -303,7 +254,7 @@ Projects protein and ligand embeddings to a shared latent space (Linear + ReLU, 
 - Same pre-computed embeddings as CosSim / Transformer
 - Hyperparameters (`n_estimators`, `max_depth`, `learning_rate`) tunable in `config.yaml`
 
-## 📊 Evaluation
+## Evaluation
 
 Models are evaluated on three test scenarios:
 1. **Random Split Validation**: Standard validation set from training distribution
@@ -327,55 +278,13 @@ If you use this code in your research, please cite:
   title={Evaluation of Deep Learning Architectures for Predicting GPCR-Mediated Neurotoxicity},
   author={Dey, Souvik and Lu, Pinyi and Wallqvist, Anders and AbdulHameed, Mohamed Diwan M.},
   journal={In preparation},
-  year={2024},
-  institution={DoD Biotechnology HPC Software Applications Institute}
+  year={2026},
 }
 ```
 
-## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
 
-## 📧 Contact
 
-For questions or issues, please open an issue on GitHub.
-
-**Authors:**
-- Souvik Dey
-- Pinyi Lu
-- Anders Wallqvist (sven.a.wallqvist.civ@health.mil)
-- Mohamed Diwan M. AbdulHameed (mabdulhameed@bhsai.org)
-
-**Affiliation:**
-DoD Biotechnology High Performance Computing Software Applications Institute
-Defense Health Agency Research & Development
-Fort Detrick, MD 21702-5012
-
-## 🙏 Acknowledgments
-
-- ProtBert: Protein language model from Rostlab
-- MolFormer: Molecular transformer from IBM Research
-- PyTorch and Hugging Face Transformers for deep learning infrastructure
-- Department of Defense Biotechnology HPC Software Applications Institute
-
-## 📝 Key Findings
-
-1. **CA-Base outperforms fine-tuning approaches**: Freezing both encoders achieves the best AUROC (0.714), suggesting pre-trained representations are already optimal for this task.
-
-2. **Ligand encoder fine-tuning helps**: CA-Lig slightly outperforms CA-Base in sensitivity and MCC.
-
-3. **Full fine-tuning can hurt performance**: CA-Full shows degraded performance compared to CA-Base, indicating potential overfitting when fine-tuning both encoders.
-
-4. **Cross-attention superior to simpler architectures**: CA models outperform CosSim and Transformer baselines.
-
-5. **Dataset characteristics matter**: The strong performance of frozen encoders may be specific to this dataset size and diversity.
